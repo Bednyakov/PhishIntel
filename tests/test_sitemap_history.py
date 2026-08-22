@@ -20,6 +20,19 @@ class SitemapHistoryTests(unittest.TestCase):
         self.assertEqual(result["count"], 2)
         self.assertEqual(fetch.call_count, 2)
 
+    @patch("app.analyzers.sitemap._fetch")
+    def test_sitemap_children_are_fetched_as_a_batch(self, fetch):
+        root = b'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>https://example.com/a.xml</loc></sitemap><sitemap><loc>https://example.com/b.xml</loc></sitemap></sitemapindex>'
+        child = b'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/</loc></url></urlset>'
+        fetch.side_effect = [(200, root, "application/xml"), (200, child, "application/xml"), (200, child, "application/xml")]
+
+        result = sitemap.analyze("example.com")
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(fetch.call_count, 3)
+        self.assertEqual({call.args[0] for call in fetch.call_args_list[1:]}, {"https://example.com/a.xml", "https://example.com/b.xml"})
+
     def test_history_records_and_detects_changes(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict("os.environ", {"PHISHINTEL_HISTORY_FILE": str(Path(directory) / "history.jsonl")}):
             first = history.record("example.com", {"status": "ok", "a": ["192.0.2.1"]}, {"status": "ok", "not_after": "2027"})

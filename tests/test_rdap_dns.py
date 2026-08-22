@@ -1,10 +1,19 @@
 import unittest
 from unittest.mock import patch
 
-from app.analyzers import dns, rdap, whois
+from app.analyzers import dns, rdap, subdomains, whois
 
 
 class AnalyzerTests(unittest.TestCase):
+    @patch("app.analyzers.subdomains.dns_analyze")
+    def test_subdomain_bruteforce_probes_candidates_in_parallel_batch(self, dns_lookup):
+        dns_lookup.side_effect = lambda candidate: {"status": "ok"} if candidate.startswith("www.") else {"status": "unavailable"}
+
+        found = subdomains._brute_force(["www.example.com", "mail.example.com", "api.example.com"])
+
+        self.assertEqual(found, {"www.example.com"})
+        self.assertEqual(dns_lookup.call_count, 3)
+
     def test_ip_result_has_normalized_shape(self):
         result = dns.analyze_ip({"a": ["192.0.2.10"]})
         self.assertEqual(result["address"], "192.0.2.10")
