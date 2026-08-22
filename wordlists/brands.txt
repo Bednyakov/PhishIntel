@@ -1,0 +1,76 @@
+google
+microsoft
+apple
+paypal
+binance
+facebook
+instagram
+amazon
+linkedin
+twitter
+x
+telegram
+whatsapp
+discord
+apple id
+icloud
+google drive
+gmail
+outlook
+office 365
+onedrive
+dropbox
+adobe
+docuSign
+zoom
+slack
+github
+gitlab
+atlassian
+notion
+salesforce
+hubspot
+stripe
+square
+wise
+venmo
+cash app
+revolut
+coinbase
+kraken
+metamask
+trust wallet
+opensea
+okx
+kucoin
+bybit
+chase
+bank of america
+wells fargo
+citi
+hsbc
+barclays
+lloyds
+natwest
+deutsche bank
+santander
+ing
+visa
+mastercard
+american express
+fedex
+ups
+dhl
+usps
+netflix
+spotify
+steam
+playstation
+xbox
+roblox
+airbnb
+uber
+booking.com
+gov.uk
+irs
+service canada

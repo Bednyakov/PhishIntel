@@ -1,0 +1,83 @@
+login
+sign in
+verify
+password
+wallet
+seed phrase
+recovery phrase
+account
+account verification
+confirm
+confirmation
+validate
+validation
+authenticate
+authentication
+authorization
+authorize
+unlock
+locked
+suspended
+suspension
+security alert
+security notice
+security update
+unusual activity
+suspicious activity
+verify your identity
+identity verification
+identity check
+update your information
+update account
+reset password
+change password
+forgot password
+two-factor
+two factor
+2fa
+mfa
+multi-factor
+one-time password
+one-time passcode
+otp
+verification code
+security code
+access code
+passcode
+token
+session expired
+session expiration
+payment
+payment failed
+payment confirmation
+billing
+invoice
+refund
+transaction
+transfer
+wire transfer
+claim
+reward
+bonus
+gift
+prize
+offer
+airdrop
+crypto
+cryptocurrency
+private key
+secret phrase
+recovery code
+backup code
+wallet connect
+connect wallet
+confirm transaction
+approve transaction
+download document
+view document
+secure message
+tax refund
+delivery
+shipment
+customs
+invoice attached
