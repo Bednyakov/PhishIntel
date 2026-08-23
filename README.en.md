@@ -57,6 +57,17 @@ Sitemaps are loaded from `https://<domain>/sitemap.xml`. The analyzer supports `
 - `--no-progress` — disable the progress bar;
 - `--output-dir` — directory for JSON reports, defaulting to `reports`;
 - `--stdout` — print JSON to stdout instead of saving it to a file.
+- `--active-tool` — explicitly run an installed active scanner (`nmap`, `nuclei`, or `zap`); repeat the option for multiple tools. Active scanning is disabled without this flag.
+
+Lightweight checks additionally inspect security headers and cookie flags, mixed content, sensitive form fields, HTTP/HTTPS form actions, GET forms, dangerous download links, `robots.txt`, and `security.txt`. These are heuristics; a missing CSRF indicator is not proof of a vulnerability.
+
+Active scanners run only with explicit `--active-tool`. Nmap and Nuclei must already be installed in `PATH`; the current ZAP integration reports configuration guidance and does not launch ZAP automatically. Run active checks only against systems you are authorized to test.
+
+```bash
+python3 scan.py example.com --active-tool nmap
+python3 scan.py example.com --active-tool nuclei
+python3 scan.py example.com --active-tool nmap --active-tool nuclei
+```
 
 Reports are pretty-printed and structured by default. To reduce the output size, use the inverse `--compact` option, for example:
 

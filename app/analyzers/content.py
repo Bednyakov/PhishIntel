@@ -3,7 +3,7 @@
 import hashlib
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urljoin, urlparse
 
 
 _WORDLIST_DIR = Path(__file__).resolve().parents[2] / "wordlists"
@@ -28,6 +28,8 @@ class _PageParser(HTMLParser):
         self._form: dict | None = None
         self.scripts: list[str] = []
         self.external_domains: set[str] = set()
+        self.resources: list[dict] = []
+        self.downloads: list[dict] = []
         self.links_count = 0
         self._in_title = False
 
@@ -63,17 +65,38 @@ class _PageParser(HTMLParser):
         elif tag == "input" and self._form is not None:
             name = values.get("name") or values.get("id") or ""
             field_type = values.get("type", "text").lower()
-            self._form["fields"].append({"name": name or None, "type": field_type})
+            field = {"name": name or None, "type": field_type}
+            for key in ("autocomplete", "placeholder", "aria-label"):
+                if values.get(key):
+                    field[key.replace("-", "_")] = values[key]
+            self._form["fields"].append(field)
         elif tag == "script":
             src = values.get("src")
             if src:
                 self.scripts.append(src)
         elif tag == "a":
             self.links_count += 1
+            href = values.get("href")
+            if href:
+                self._record_resource(href, "link")
+        elif tag in ("img", "script", "iframe", "video", "audio", "source", "object", "embed", "link"):
+            for attribute in ("src", "href", "data"):
+                if values.get(attribute):
+                    self._record_resource(values[attribute], tag)
         for attribute in ("src", "href", "action"):
             value = values.get(attribute)
             if value and "://" in value:
                 self.external_domains.add(urlparse(value).hostname or value)
+
+    def _record_resource(self, value: str, kind: str) -> None:
+        resolved = urljoin(self.page_url or "", value)
+        parsed = urlparse(resolved)
+        if parsed.scheme not in ("http", "https"):
+            return
+        item = {"url": resolved, "type": kind, "scheme": parsed.scheme}
+        self.resources.append(item)
+        if parsed.path.lower().endswith((".exe", ".msi", ".dmg", ".pkg", ".apk", ".ipa", ".scr", ".bat", ".cmd", ".ps1", ".js", ".vbs", ".jar", ".zip", ".rar", ".7z")):
+            self.downloads.append({"url": resolved, "type": kind, "extension": parsed.path.rsplit(".", 1)[-1].lower()})
 
     def handle_endtag(self, tag: str) -> None:
         if tag.lower() == "title":
@@ -101,6 +124,33 @@ def analyze(http_result: dict) -> dict:
     title = " ".join("".join(parser.title_parts).split()) or None
     brands = _load_wordlist("brands.txt", ("google", "microsoft", "apple", "paypal", "binance", "facebook", "instagram", "amazon"))
     brand_match = sorted({brand for brand in brands if brand in lower or (title and brand in title.lower())})
+    page_url = http_result.get("url") or ""
+    page_scheme = urlparse(page_url).scheme.lower()
+    sensitive_names = ("password", "passwd", "card", "cvv", "token", "secret", "seed", "ssn", "passport", "phone", "email", "address", "iban")
+    sensitive_types = {"password", "email", "tel", "number"}
+    for form in parser.forms:
+        sensitive_fields = []
+        for field in form["fields"]:
+            haystack = " ".join(str(field.get(key) or "").lower() for key in ("name", "type", "placeholder", "aria_label"))
+            if field.get("type") in sensitive_types or any(name in haystack for name in sensitive_names):
+                sensitive_fields.append(field.get("name") or field.get("type"))
+        form["sensitive_fields"] = sorted(set(sensitive_fields))
+        action = form.get("action") or page_url
+        action_scheme = urlparse(action).scheme.lower()
+        form["page_scheme"] = page_scheme or None
+        form["action_scheme"] = action_scheme or None
+        form["transport_encrypted"] = page_scheme == "https" and action_scheme == "https"
+        form["external_action"] = form.get("same_origin") is False
+        form["issues"] = []
+        if form["sensitive_fields"] and form["method"] == "GET":
+            form["issues"].append("sensitive_data_in_query")
+        if form["sensitive_fields"] and not form["transport_encrypted"]:
+            form["issues"].append("unencrypted_transport")
+        if form["external_action"]:
+            form["issues"].append("external_action")
+        if form["sensitive_fields"] and not any("csrf" in str(field.get("name") or "").lower() or "xsrf" in str(field.get("name") or "").lower() or "token" in str(field.get("name") or "").lower() for field in form["fields"]):
+            form["issues"].append("csrf_indicator_not_found")
+    mixed_content = sorted({item["url"] for item in parser.resources if page_scheme == "https" and item["scheme"] == "http"})
     if brand_match:
         indicators.append({"name": "brand_reference", "severity": "informational", "description": "Known brand referenced by page", "evidence": brand_match})
-    return {"status": "ok", "title": title, "language": parser.language, "body_length": len(raw_body), "sha256": hashlib.sha256(raw_body if isinstance(raw_body, bytes) else body.encode()).hexdigest(), "forms": parser.forms, "keywords": found, "brand_match": brand_match, "technologies": technologies, "external_domains": sorted(parser.external_domains), "scripts": parser.scripts, "links_count": parser.links_count, "risk_indicators": indicators}
+    return {"status": "ok", "title": title, "language": parser.language, "body_length": len(raw_body), "sha256": hashlib.sha256(raw_body if isinstance(raw_body, bytes) else body.encode()).hexdigest(), "forms": parser.forms, "keywords": found, "brand_match": brand_match, "technologies": technologies, "external_domains": sorted(parser.external_domains), "scripts": parser.scripts, "links_count": parser.links_count, "risk_indicators": indicators, "mixed_content": mixed_content, "dangerous_downloads": parser.downloads, "query_parameters": sorted({key for item in parser.resources for key, _ in parse_qsl(urlparse(item["url"]).query) if key.lower() in sensitive_names})}

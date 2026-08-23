@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .analyzers import content, dns, domain, http, rdap, redirects, sitemap, subdomains, tls, whois
+from .analyzers import active, content, dns, domain, headers, http, rdap, redirects, resources, sitemap, subdomains, tls, whois
 from .analyzers.common import normalize_target
 from .history import record as record_history
 from .models.report import Report
@@ -18,6 +18,8 @@ CHECK_STAGES = (
     "http",
     "redirects",
     "content",
+    "headers",
+    "resources",
     "whois",
     "sitemap",
     "subdomains",
@@ -26,7 +28,7 @@ CHECK_STAGES = (
 )
 
 
-def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict], None] | None = None) -> dict:
+def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict], None] | None = None, active_tools: tuple[str, ...] = ()) -> dict:
     """Run all checks and optionally report completed stages."""
     host, _ = normalize_target(target)
 
@@ -56,13 +58,17 @@ def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict
     results["content"] = content.analyze(results["http"])
     complete("content")
     results["http"].pop("_body", None)
+    results["headers"] = headers.analyze(results["http"])
+    complete("headers")
+    results["resources"] = resources.analyze(host, timeout)
+    complete("resources")
     results["whois"] = whois.analyze(host, timeout)
     complete("whois")
     results["sitemap"] = sitemap.analyze(host, timeout)
     complete("sitemap")
     results["subdomains"] = subdomains.analyze(host, timeout=min(timeout, 3))
     complete("subdomains")
-    results.update({"technologies": results["content"].get("technologies", []), "forms": results["content"].get("forms", []), "reputation": {"status": "not_configured"}, "history": record_history(host, dns_result, results["tls"])})
+    results.update({"technologies": results["content"].get("technologies", []), "forms": results["content"].get("forms", []), "reputation": {"status": "not_configured"}, "active_scan": active.analyze(host, timeout=max(timeout, 60.0), tools=active_tools), "history": record_history(host, dns_result, results["tls"])})
     complete("history")
     risk, indicators = score(results)
     complete("scoring")

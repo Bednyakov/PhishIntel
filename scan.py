@@ -38,9 +38,10 @@ def main() -> int:
     parser.add_argument("--no-progress", action="store_true", help="не показывать progress bar")
     parser.add_argument("--output-dir", default="reports", help="directory for JSON reports")
     parser.add_argument("--stdout", action="store_true", help="print JSON to stdout instead of saving a report file")
+    parser.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"), help="explicitly run an installed active scanner; repeat for multiple tools")
     args = parser.parse_args()
     try:
-        report = analyze(args.domain, args.timeout, None if args.no_progress else _render_progress)
+        report = analyze(args.domain, args.timeout, None if args.no_progress else _render_progress, tuple(args.active_tool or ()))
     except ValueError as exc:
         parser.error(str(exc))
         return 2
