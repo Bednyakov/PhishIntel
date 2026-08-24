@@ -2,7 +2,7 @@
 
 ![PhishIntel](https://github.com/Bednyakov/PhishIntel/blob/main/data/PhishIntel.png)
 
-[Видеоинструкция проверки подозрительного сайта](https://www.youtube.com/watch?v=gJqeG9Og9_Q)
+![Видеоинструкция проверки подозрительного сайта](https://www.youtube.com/watch?v=gJqeG9Og9_Q)
 
 
 [English version](README.en.md)
