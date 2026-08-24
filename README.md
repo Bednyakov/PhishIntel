@@ -2,7 +2,7 @@
 
 ![PhishIntel](https://github.com/Bednyakov/PhishIntel/blob/main/data/PhishIntel.png)
 
-https://www.youtube.com/watch?v=gJqeG9Og9_Q
+[![PhishIntel на YouTube](https://img.youtube.com/vi/gJqeG9Og9_Q/0.jpg)](https://www.youtube.com/watch?v=gJqeG9Og9_Q)
 
 
 [English version](README.en.md)
