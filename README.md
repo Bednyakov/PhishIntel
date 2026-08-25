@@ -112,6 +112,12 @@ sudo apt update
 sudo apt install nmap
 ```
 
+Установка Playwright
+```bash
+pip install playwright
+playwright install chromium
+```
+
 Отчёты по умолчанию сохраняются в структурированном, форматированном JSON. Для уменьшения размера вывода можно использовать обратный флаг `--compact`, например:
 
 ```bash
