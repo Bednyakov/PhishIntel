@@ -78,7 +78,7 @@ Sitemap загружается с `https://<domain>/sitemap.xml`; поддерж
 Репутация настраивается переменными `PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY` и `PHISHINTEL_VIRUSTOTAL_KEY`; ненастроенные источники не включаются в отчёт. Для поисковой видимости используется `PHISHINTEL_BING_KEY`; блок добавляется только при запуске с `--search` и настроенным ключом. Внешние URL очищаются от query-параметров перед репутационной проверкой, чтобы не отправлять потенциальные токены.
 
 Пример запуска с переменными для одной команды:
-```
+```bash
 PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY="google-key" \
 PHISHINTEL_VIRUSTOTAL_KEY="virustotal-key" \
 PHISHINTEL_BING_KEY="bing-key" \
@@ -86,13 +86,13 @@ python3 scan.py example.com --search
 ```
 
 на текущую сессию терминала:
-```
+```bash
 export PHISHINTEL_VIRUSTOTAL_KEY="ваш_ключ"
 export PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY="ваш_ключ"
 export PHISHINTEL_BING_KEY="ваш_ключ"
 ```
 после этого:
-```
+```bash
 python3 scan.py example.com --search
 ```
 
@@ -104,6 +104,12 @@ python3 scan.py example.com --search
 python3 scan.py example.com --active-tool nmap
 python3 scan.py example.com --active-tool nuclei
 python3 scan.py example.com --active-tool nmap --active-tool nuclei
+```
+
+Установка nmap:
+```bash
+sudo apt update
+sudo apt install nmap
 ```
 
 Отчёты по умолчанию сохраняются в структурированном, форматированном JSON. Для уменьшения размера вывода можно использовать обратный флаг `--compact`, например:
