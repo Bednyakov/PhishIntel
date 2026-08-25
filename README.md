@@ -17,7 +17,7 @@ python3 scan.py example.com
 ```
 
 или с доп флагами:
-```
+```bash
 python3 scan.py example.com --no-progress
 python3 scan.py example.com --output-dir ./reports
 python3 scan.py example.com --stdout
