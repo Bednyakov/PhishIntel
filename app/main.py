@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .analyzers import active, content, dns, domain, headers, http, rdap, redirects, resources, sitemap, subdomains, tls, whois
+from .analyzers import active, content, dns, domain, dynamic, headers, http, javascript, rdap, redirects, reputation, resources, search, sitemap, subdomains, tls, whois
 from .analyzers.common import normalize_target
 from .history import record as record_history
 from .models.report import Report
@@ -24,11 +24,15 @@ CHECK_STAGES = (
     "sitemap",
     "subdomains",
     "history",
+    "reputation",
+    "javascript",
+    "dynamic",
+    "search",
     "scoring",
 )
 
 
-def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict], None] | None = None, active_tools: tuple[str, ...] = ()) -> dict:
+def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict], None] | None = None, active_tools: tuple[str, ...] = (), dynamic_analysis: bool = False, search_analysis: bool = False) -> dict:
     """Run all checks and optionally report completed stages."""
     host, _ = normalize_target(target)
 
@@ -68,8 +72,21 @@ def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict
     complete("sitemap")
     results["subdomains"] = subdomains.analyze(host, timeout=min(timeout, 3))
     complete("subdomains")
-    results.update({"technologies": results["content"].get("technologies", []), "forms": results["content"].get("forms", []), "reputation": {"status": "not_configured"}, "active_scan": active.analyze(host, timeout=max(timeout, 60.0), tools=active_tools), "history": record_history(host, dns_result, results["tls"])})
+    results.update({"technologies": results["content"].get("technologies", []), "forms": results["content"].get("forms", []), "active_scan": active.analyze(host, timeout=max(timeout, 60.0), tools=active_tools), "history": record_history(host, dns_result, results["tls"])})
     complete("history")
+    reputation_result = reputation.analyze(host, results["http"], results["redirects"], results["content"], results["ip"], timeout)
+    if reputation_result.get("status") != "not_configured":
+        results["reputation"] = reputation_result
+    complete("reputation")
+    results["javascript"] = javascript.analyze(results["http"], results["content"], timeout)
+    complete("javascript")
+    results["dynamic_analysis"] = dynamic.analyze(results["redirects"].get("final_url") or results["http"].get("url"), timeout=max(timeout, 15.0)) if dynamic_analysis else {"status": "not_requested"}
+    complete("dynamic")
+    if search_analysis:
+        search_result = search.analyze(host, timeout)
+        if search_result.get("status") != "not_configured":
+            results["search_visibility"] = search_result
+    complete("search")
     risk, indicators = score(results)
     complete("scoring")
     return Report(target=host, results=results, indicators=indicators, risk=risk).as_dict()

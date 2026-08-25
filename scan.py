@@ -39,9 +39,11 @@ def main() -> int:
     parser.add_argument("--output-dir", default="reports", help="directory for JSON reports")
     parser.add_argument("--stdout", action="store_true", help="print JSON to stdout instead of saving a report file")
     parser.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"), help="explicitly run an installed active scanner; repeat for multiple tools")
+    parser.add_argument("--dynamic", action="store_true", help="run optional isolated Playwright browser analysis")
+    parser.add_argument("--search", action="store_true", help="query configured search provider for OSINT visibility")
     args = parser.parse_args()
     try:
-        report = analyze(args.domain, args.timeout, None if args.no_progress else _render_progress, tuple(args.active_tool or ()))
+        report = analyze(args.domain, args.timeout, None if args.no_progress else _render_progress, tuple(args.active_tool or ()), args.dynamic, args.search)
     except ValueError as exc:
         parser.error(str(exc))
         return 2

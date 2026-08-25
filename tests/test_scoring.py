@@ -40,6 +40,15 @@ class ScoringTests(unittest.TestCase):
         self.assertIn("one-time passcode", result["keywords"])
         self.assertIn("netflix", result["brand_match"])
 
+    def test_reputation_and_javascript_findings_are_scored(self):
+        risk, indicators = score({
+            "content": {"forms": [], "keywords": [], "brand_match": []},
+            "reputation": {"status": "malicious", "summary": {"malicious_sources": 1}},
+            "javascript": {"scripts": [{"findings": [{"name": "obfuscated_javascript", "severity": "medium"}]}]},
+        })
+        self.assertEqual(risk["level"], "critical")
+        self.assertTrue(any(item["name"] == "reputation_malicious" for item in indicators))
+
 
 if __name__ == "__main__":
     unittest.main()

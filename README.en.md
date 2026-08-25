@@ -39,7 +39,10 @@ While the scan is running, the CLI displays a progress bar in `stderr`, showing 
 - sitemap analysis for `urlset` and `sitemapindex`;
 - local DNS/TLS history;
 - basic subdomain discovery;
-- explainable, context-aware phishing-risk scoring.
+- explainable, context-aware phishing-risk scoring;
+- configurable reputation checks for domains, URLs, IP addresses, form actions, and external resources;
+- bounded static JavaScript analysis and optional isolated browser observation;
+- optional search-visibility OSINT, which is not a standalone risk verdict.
 
 A keyword alone receives an `informational` severity. The severity increases only when additional form, brand, or external `action` context is present.
 
@@ -57,9 +60,15 @@ Sitemaps are loaded from `https://<domain>/sitemap.xml`. The analyzer supports `
 - `--no-progress` — disable the progress bar;
 - `--output-dir` — directory for JSON reports, defaulting to `reports`;
 - `--stdout` — print JSON to stdout instead of saving it to a file.
-- `--active-tool` — explicitly run an installed active scanner (`nmap`, `nuclei`, or `zap`); repeat the option for multiple tools. Active scanning is disabled without this flag.
+- `--active-tool` — explicitly run an installed active scanner (`nmap`, `nuclei`, or `zap`); repeat the option for multiple tools. Active scanning is disabled without this flag;
+- `--dynamic` — run isolated browser analysis through Playwright when Playwright and Chromium/Chrome are installed;
+- `--search` — query the configured Bing Web Search API for search visibility; the result does not affect the risk score.
 
 Lightweight checks additionally inspect security headers and cookie flags, mixed content, sensitive form fields, HTTP/HTTPS form actions, GET forms, dangerous download links, `robots.txt`, and `security.txt`. These are heuristics; a missing CSRF indicator is not proof of a vulnerability.
+
+Reputation checks use the optional `PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY` and `PHISHINTEL_VIRUSTOTAL_KEY` environment variables; unconfigured providers are omitted from the report. Search visibility uses `PHISHINTEL_BING_KEY`; its block is added only when `--search` is used with a configured key. External URLs have query parameters removed before reputation checks so that potential tokens are not sent to providers.
+
+Static JavaScript analysis downloads a bounded number of external scripts, stores metadata and SHA-256 hashes, and checks heuristics such as `eval`, dynamic loading, cookie access, network submissions, and obfuscation. These signals are not proof of malware. Dynamic analysis is enabled only explicitly, does not submit forms, and disables downloads; use it only against systems you are authorized to test.
 
 Active scanners run only with explicit `--active-tool`. Nmap and Nuclei must already be installed in `PATH`; the current ZAP integration reports configuration guidance and does not launch ZAP automatically. Run active checks only against systems you are authorized to test.
 

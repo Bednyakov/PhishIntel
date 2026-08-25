@@ -36,11 +36,12 @@ def analyze(target: str) -> dict:
 
 
 def analyze_ip(dns_result: dict) -> dict:
-    address = (dns_result.get("a") or dns_result.get("aaaa") or [None])[0]
+    addresses = sorted(set(dns_result.get("a", []) + dns_result.get("aaaa", [])))
+    address = (addresses or [None])[0]
     if not address:
-        return {"status": "unavailable", "address": None, "version": None, "asn": None, "organization": None, "country": None, "city": None, "reverse_dns": None}
+        return {"status": "unavailable", "address": None, "addresses": [], "version": None, "asn": None, "organization": None, "country": None, "city": None, "reverse_dns": None}
     try:
         reverse = socket.gethostbyaddr(address)[0]
     except (OSError, socket.herror):
         reverse = None
-    return {"status": "ok", "address": address, "version": 6 if ":" in address else 4, "asn": None, "organization": None, "country": None, "city": None, "reverse_dns": reverse}
+    return {"status": "ok", "address": address, "addresses": addresses, "version": 6 if ":" in address else 4, "asn": None, "organization": None, "country": None, "city": None, "reverse_dns": reverse}

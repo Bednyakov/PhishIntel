@@ -20,6 +20,8 @@ def score(results: dict) -> tuple[dict, list[dict]]:
     forms = content.get("forms", [])
     header_issues = set(results.get("headers", {}).get("issues", []))
     active_findings = [finding for tool in results.get("active_scan", {}).get("tools", {}).values() for finding in tool.get("findings", []) if isinstance(finding, dict)]
+    reputation = results.get("reputation", {})
+    javascript = results.get("javascript", {})
     brand = bool(results.get("domain", {}).get("brand_match") or content.get("brand_match"))
     login_form = bool(forms)
     password_form = any(any(field.get("type") == "password" or any(word in (field.get("name") or "").lower() for word in ("password", "passwd", "card", "cvv", "token")) for field in form.get("fields", [])) or form.get("sensitive_fields") for form in forms)
@@ -45,6 +47,13 @@ def score(results: dict) -> tuple[dict, list[dict]]:
         indicators.append(_indicator("mixed_content", "medium", "HTTPS page references unencrypted HTTP resources", content["mixed_content"]))
     if "permissive_cors" in header_issues:
         indicators.append(_indicator("permissive_cors", "medium", "Server exposes a permissive CORS policy"))
+    if reputation.get("status") == "malicious":
+        indicators.append(_indicator("reputation_malicious", "critical", "One or more configured reputation sources reported a malicious entity", reputation.get("summary")))
+    elif reputation.get("status") == "suspicious":
+        indicators.append(_indicator("reputation_suspicious", "high", "One or more configured reputation sources reported a suspicious entity", reputation.get("summary")))
+    js_findings = [finding for item in javascript.get("scripts", []) for finding in item.get("findings", [])]
+    if any(item.get("severity") == "medium" for item in js_findings):
+        indicators.append(_indicator("suspicious_javascript", "medium", "JavaScript contains suspicious static-analysis patterns", js_findings))
     for finding in active_findings:
         severity = finding.get("severity")
         if severity in {"low", "medium", "high", "critical"}:
