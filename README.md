@@ -8,10 +8,6 @@
                  PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL
 ```
 
-## Видеоинструкция проверки подозрительного сайта
-[![PhishIntel на YouTube](https://img.youtube.com/vi/gJqeG9Og9_Q/0.jpg)](https://www.youtube.com/watch?v=gJqeG9Og9_Q)
-
-
 [English version](README.en.md)
 
 Автономный OSINT инструмент для анализа доменов и оценки фишингового риска с JSON-контрактом отчёта.
