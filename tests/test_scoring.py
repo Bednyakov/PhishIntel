@@ -40,6 +40,14 @@ class ScoringTests(unittest.TestCase):
         self.assertIn("one-time passcode", result["keywords"])
         self.assertIn("netflix", result["brand_match"])
 
+    def test_content_extracts_contact_lists(self):
+        html = b'''<a href="mailto:Support@Example.com">email</a><a href="tel:+7 (999) 123-45-67">call</a><p>Write to support@example.com or call +7 (999) 123-45-67.</p>'''
+        result = analyze({"status": "ok", "url": "https://example.com", "_body": html})
+
+        self.assertEqual(result["contacts"]["emails"], ["support@example.com"])
+        self.assertEqual(result["contacts"]["phones"], ["+7 (999) 123-45-67"])
+        self.assertEqual(result["contacts"]["other"], ["mailto:Support@Example.com", "tel:+7 (999) 123-45-67"])
+
     def test_reputation_and_javascript_findings_are_scored(self):
         risk, indicators = score({
             "content": {"forms": [], "keywords": [], "brand_match": []},

@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .analyzers import active, content, dns, domain, dynamic, headers, http, javascript, rdap, redirects, reputation, resources, search, sitemap, subdomains, tls, whois
+from .analyzers import active, content, dns, domain, dynamic, headers, http, ipinfo, javascript, rdap, redirects, reputation, resources, search, sitemap, subdomains, tls, whois
 from .analyzers.common import normalize_target
 from .history import record as record_history
 from .models.report import Report
@@ -23,6 +23,7 @@ CHECK_STAGES = (
     "whois",
     "sitemap",
     "subdomains",
+    "active_scan",
     "history",
     "reputation",
     "javascript",
@@ -32,17 +33,20 @@ CHECK_STAGES = (
 )
 
 
-def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict], None] | None = None, active_tools: tuple[str, ...] = (), dynamic_analysis: bool = False, search_analysis: bool = False) -> dict:
+def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict], None] | None = None, active_tools: tuple[str, ...] | None = None, dynamic_analysis: bool = False, search_analysis: bool = False, javascript_analysis: bool = True, thorough_active: bool = False) -> dict:
     """Run all checks and optionally report completed stages."""
     host, _ = normalize_target(target)
 
     completed = 0
 
+    def report(stage: str, status: str) -> None:
+        if progress_callback is not None:
+            progress_callback({"stage": stage, "status": status, "completed": completed, "total": len(CHECK_STAGES), "percent": completed * 100 // len(CHECK_STAGES)})
+
     def complete(stage: str) -> None:
         nonlocal completed
         completed += 1
-        if progress_callback is not None:
-            progress_callback({"stage": stage, "completed": completed, "total": len(CHECK_STAGES), "percent": completed * 100 // len(CHECK_STAGES)})
+        report(stage, "completed")
 
     dns_result = dns.analyze(host)
     results = {"domain": domain.analyze(host)}
@@ -50,6 +54,9 @@ def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict
     results["dns"] = dns_result
     complete("dns")
     results["ip"] = dns.analyze_ip(dns_result)
+    ipinfo_result = ipinfo.analyze(results["ip"].get("address"), timeout)
+    if ipinfo_result is not None:
+        results["ip"]["ipinfo"] = ipinfo_result
     complete("ip")
     results["rdap"] = rdap.analyze(host, timeout)
     complete("rdap")
@@ -72,13 +79,17 @@ def analyze(target: str, timeout: float = 8.0, progress_callback: Callable[[dict
     complete("sitemap")
     results["subdomains"] = subdomains.analyze(host, timeout=min(timeout, 3))
     complete("subdomains")
-    results.update({"technologies": results["content"].get("technologies", []), "forms": results["content"].get("forms", []), "active_scan": active.analyze(host, timeout=max(timeout, 60.0), tools=active_tools), "history": record_history(host, dns_result, results["tls"])})
+    report("active_scan", "running")
+    results.update({"technologies": results["content"].get("technologies", []), "forms": results["content"].get("forms", []), "active_scan": active.analyze(host, timeout=max(timeout, 60.0), tools=active_tools, thorough=thorough_active)})
+    report("active_scan", "completed")
+    results["history"] = record_history(host, dns_result, results["tls"])
+    complete("active_scan")
     complete("history")
     reputation_result = reputation.analyze(host, results["http"], results["redirects"], results["content"], results["ip"], timeout)
     if reputation_result.get("status") != "not_configured":
         results["reputation"] = reputation_result
     complete("reputation")
-    results["javascript"] = javascript.analyze(results["http"], results["content"], timeout)
+    results["javascript"] = javascript.analyze(results["http"], results["content"], timeout) if javascript_analysis else {"status": "not_requested"}
     complete("javascript")
     results["dynamic_analysis"] = dynamic.analyze(results["redirects"].get("final_url") or results["http"].get("url"), timeout=max(timeout, 15.0)) if dynamic_analysis else {"status": "not_requested"}
     complete("dynamic")

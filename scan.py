@@ -18,8 +18,10 @@ def _render_progress(update: dict) -> None:
     total = update["total"]
     filled = width * completed // total
     bar = "#" * filled + "-" * (width - filled)
-    print(f"\rПроверка: [{bar}] {completed}/{total} ({update['percent']}%) — {update['stage']}", end="", file=sys.stderr, flush=True)
-    if completed == total:
+    status = update.get("status", "completed")
+    suffix = " (выполняется)" if status == "running" else ""
+    print(f"\rПроверка: [{bar}] {completed}/{total} ({update['percent']}%) — {update['stage']}{suffix}", end="", file=sys.stderr, flush=True)
+    if completed == total and status == "completed":
         print(file=sys.stderr)
 
 
@@ -38,12 +40,19 @@ def main() -> int:
     parser.add_argument("--no-progress", action="store_true", help="не показывать progress bar")
     parser.add_argument("--output-dir", default="reports", help="directory for JSON reports")
     parser.add_argument("--stdout", action="store_true", help="print JSON to stdout instead of saving a report file")
-    parser.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"), help="explicitly run an installed active scanner; repeat for multiple tools")
+    parser.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"), help="run only the selected active scanner; repeat for multiple tools (by default all scanners are checked)")
     parser.add_argument("--dynamic", action="store_true", help="run optional isolated Playwright browser analysis")
     parser.add_argument("--search", action="store_true", help="query configured search provider for OSINT visibility")
+    parser.add_argument("--profile", choices=("quick", "full", "security"), help="analysis profile; explicit flags remain supported")
     args = parser.parse_args()
     try:
-        report = analyze(args.domain, args.timeout, None if args.no_progress else _render_progress, tuple(args.active_tool or ()), args.dynamic, args.search)
+        if args.profile == "quick":
+            args.dynamic, args.search, args.active_tool = False, False, []
+        elif args.profile == "full":
+            args.dynamic, args.search = False, True
+        elif args.profile == "security":
+            args.dynamic, args.search = True, True
+        report = analyze(args.domain, args.timeout, None if args.no_progress else _render_progress, tuple(args.active_tool) if args.active_tool else None, args.dynamic, args.search, args.profile != "quick")
     except ValueError as exc:
         parser.error(str(exc))
         return 2

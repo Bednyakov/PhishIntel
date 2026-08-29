@@ -13,17 +13,23 @@
 ## Запуск
 
 ```bash
-python3 scan.py example.com
+python3 main.py
 ```
 
-или с доп флагами:
+Для прямого запуска анализа домена:
+
 ```bash
-python3 scan.py example.com --no-progress
-python3 scan.py example.com --output-dir ./reports
-python3 scan.py example.com --stdout
-python3 scan.py example.com --active-tool nmap --dynamic --search
+python3 main.py domain-scan example.com --profile quick
+python3 main.py domain-scan example.com --profile full --stdout
+python3 main.py domain-scan example.com --profile security --active-tool nmap
 python3 -m unittest discover -s tests -v
 ```
+
+Профили отличаются уровнем проверки:
+
+- `quick` — базовые сетевые проверки без JavaScript, поиска и активных сканеров;
+- `full` — полный анализ с JavaScript, динамическим браузерным анализом и поисковой видимостью;
+- `security` — расширенный аудит с JavaScript, динамическим анализом и всеми активными сканерами в thorough-режиме.
 
 Сетевые проверки не являются обязательными: ошибки DNS/HTTP/TLS возвращаются в соответствующем разделе как `status: unavailable`, поэтому один недоступный сервис не останавливает полный отчёт.
 
@@ -61,15 +67,17 @@ ASN, organization, country и city в IP-результате возвращаю
 
 Sitemap загружается с `https://<domain>/sitemap.xml`; поддерживаются `urlset` и `sitemapindex` с ограничениями 10 sitemap-файлов, 2 MB на файл и 10 000 URL. История сохраняется в JSONL-файл `data/history.jsonl`. Путь можно изменить переменной `PHISHINTEL_HISTORY_FILE`. В отчёте поле `history` содержит снимки DNS/TLS, а также изменения относительно предыдущего запуска. Битые строки истории игнорируются.
 
-## CLI-параметры
+## Параметры инструмента анализа домена
 
-- `domain` — домен или URL для проверки;
+- `domain-scan` — инструмент анализа домена;
+- `target` — домен или URL для проверки;
+- `--profile` — профиль анализа: `quick`, `full` или `security`;
 - `--timeout` — таймаут сетевых операций в секундах, по умолчанию `8.0`;
 - `--compact` — вывести компактный JSON без отступов (по умолчанию отчёт форматированный);
 - `--no-progress` — отключить индикатор прогресса;
 - `--output-dir` — директория для JSON-отчётов, по умолчанию `reports`;
 - `--stdout` — вывести JSON в stdout вместо сохранения в файл;
-- `--active-tool` — явно запустить установленный активный сканер (`nmap`, `nuclei` или `zap`); параметр можно повторять. Без этого флага активное сканирование отключено.
+- `--active-tool` — ограничить активное сканирование выбранными сканерами (`nmap`, `nuclei` или `zap`); параметр можно повторять. В профиле `security` без этого параметра запускаются все поддерживаемые сканеры. Thorough Nmap сначала выполняет быстрый bounded discovery, затем определение версий, NSE и ОС; отдельный бюджет Nmap составляет не менее 300 секунд, чтобы полный аудит не прерывался обычным сетевым timeout. Nuclei запускает все доступные шаблоны выбранных уровней severity без quick rate limit. Скрипты Nmap из категорий эксплуатации и brute force не запускаются. Если сканер не установлен или не настроен, это указывается в `active_scan.tools`, а отчёт продолжает формироваться.
 - `--dynamic` — запустить изолированный браузерный анализ через Playwright, если установлен Playwright и Chromium/Chrome;
 - `--search` — запросить поисковую видимость через настроенный Bing Web Search API; результат не влияет на оценку риска.
 
@@ -82,7 +90,7 @@ Sitemap загружается с `https://<domain>/sitemap.xml`; поддерж
 PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY="google-key" \
 PHISHINTEL_VIRUSTOTAL_KEY="virustotal-key" \
 PHISHINTEL_BING_KEY="bing-key" \
-python3 scan.py example.com --search
+python3 main.py domain-scan example.com --profile full
 ```
 
 или задать переменные на текущую сессию терминала:
@@ -93,17 +101,17 @@ export PHISHINTEL_BING_KEY="ваш_ключ"
 ```
 после этого:
 ```bash
-python3 scan.py example.com --search
+python3 main.py domain-scan example.com --profile full
 ```
 
 Статический анализ JavaScript загружает ограниченное число внешних скриптов, сохраняет только метаданные и SHA-256 и использует эвристики (`eval`, динамическая загрузка, cookie-доступ, сетевые отправки и обфускация). Эти признаки не являются доказательством malware. Динамический режим запускается только явно, без отправки форм и с запретом загрузок; используйте его только для разрешённых целей.
 
-Активные сканеры запускаются только по явному `--active-tool`. Nmap и Nuclei должны быть заранее установлены в `PATH`; ZAP в текущей версии возвращает инструкцию по настройке API и не запускается автоматически. Запускайте такие проверки только для систем, на которые у вас есть разрешение.
+В профиле `security` активные сканеры запускаются автоматически; `--active-tool` позволяет ограничить набор. В thorough-режиме Nmap проверяет все TCP-порты, версии сервисов, ОС, default NSE и безопасные NSE-проверки категории `vuln`, а Nuclei выполняет все доступные шаблонные проверки уровней low–critical. ZAP требует предварительно настроенного daemon/API и возвращает инструкцию по настройке, если конфигурация отсутствует. Скрипты Nmap для эксплуатации и brute force намеренно исключены. Запускайте такие проверки только для систем, на которые у вас есть разрешение.
 
 ```bash
-python3 scan.py example.com --active-tool nmap
-python3 scan.py example.com --active-tool nuclei
-python3 scan.py example.com --active-tool nmap --active-tool nuclei
+python3 main.py domain-scan example.com --profile security --active-tool nmap
+python3 main.py domain-scan example.com --profile security --active-tool nuclei
+python3 main.py domain-scan example.com --profile security --active-tool nmap --active-tool nuclei
 ```
 
 Установка nmap:
@@ -121,7 +129,7 @@ playwright install chromium
 Отчёты по умолчанию сохраняются в структурированном, форматированном JSON. Для уменьшения размера вывода можно использовать обратный флаг `--compact`, например:
 
 ```bash
-python3 scan.py example.com --stdout --compact --no-progress > report.json
+python3 main.py domain-scan example.com --stdout --no-progress > report.json
 ```
 
 Файлы `wordlists/brands.txt` и `wordlists/phishing_keywords.txt` используются для поиска упоминаний брендов и фишинговых фраз в содержимом страниц. Файл `wordlists/subdomains.txt` используется для DNS-проверки распространённых subdomains. Списки можно расширять построчно; пустые строки и строки, начинающиеся с `#`, игнорируются.
@@ -131,14 +139,14 @@ python3 scan.py example.com --stdout --compact --no-progress > report.json
 Для автоматизации можно явно вывести JSON в stdout:
 
 ```bash
-python3 scan.py example.com --stdout --no-progress > report.json
+python3 main.py domain-scan example.com --stdout --no-progress > report.json
 ```
 
 _____
 
 ## Подробнее о том, что входит в стандартную проверку
 
-При запуске голого сканера командой "python3 scan.py example.com" отчет будет содержать:
+При запуске инструмента командой "python3 main.py domain-scan example.com --profile full" отчет будет содержать:
 
 - Анализ домена. Проверяет структуру доменного имени: TLD, отдельные labels, длину домена и наличие подозрительных слов вроде login, secure, verify, wallet. Также определяет, является ли адрес поддоменом. В отчёт попадают нормализованный домен, список меток, длина, найденные подозрительные термины и признак is_subdomain.
 
@@ -179,6 +187,6 @@ _____
 
 - Динамическйи браузерный анализ. Опционально запускает страницу в изолированном Chromium через Playwright. Фиксирует конечный URL, заголовок страницы, HTTP‑код, количество запросов, внешние домены, браузерные редиректы и события загрузки файлов. Анализ запускается только с флагом --dynamic, запрещает загрузки и не отправляет формы.
 
-- Активное сканирование. Опционально запускает явно указанные внешние инструменты: Nmap, Nuclei или ZAP. Nmap проверяет наиболее распространённые порты и выделяет потенциально опасные открытые сервисы; Nuclei возвращает JSONL‑результаты шаблонных проверок; ZAP требует предварительно настроенного daemon/API. В отчёт входят статусы инструментов, параметры области, найденные порты/уязвимости, stdout и stderr; без явного флага активное сканирование отключено.
+- Активное сканирование. Профиль `security` запускает Nmap, Nuclei и ZAP. В thorough-режиме Nmap проверяет все TCP-порты, версии сервисов, ОС, default NSE и безопасные NSE-проверки категории `vuln`; Nuclei выполняет все доступные шаблонные проверки уровней low–critical. ZAP требует предварительно настроенного daemon/API. В отчёт входят статусы инструментов, параметры области, найденные порты/уязвимости, stdout и stderr. Запускайте активные проверки только против систем, на тестирование которых у вас есть разрешение.
 
 - Поисковая видимость. Опционально выполняет запрос site:<domain> через Bing Web Search API. В отчёт попадают примерное количество результатов и список найденных страниц с названиями и URL. Этот модуль предназначен для OSINT‑оценки присутствия домена в поиске и не влияет на итоговый риск‑скоринг.

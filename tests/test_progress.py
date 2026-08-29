@@ -27,10 +27,32 @@ class ProgressTests(unittest.TestCase):
         updates = []
         analyze("example.com", progress_callback=updates.append)
 
-        self.assertEqual([item["stage"] for item in updates], list(CHECK_STAGES))
-        self.assertEqual([item["completed"] for item in updates], list(range(1, len(CHECK_STAGES) + 1)))
+        completed_updates = [item for item in updates if item["status"] == "completed"]
+        self.assertEqual([item["stage"] for item in completed_updates], list(CHECK_STAGES))
+        self.assertEqual([item["completed"] for item in completed_updates], list(range(1, len(CHECK_STAGES) + 1)))
         self.assertTrue(all(item["total"] == len(CHECK_STAGES) for item in updates))
         self.assertEqual(updates[-1]["percent"], 100)
+
+    @patch("app.main.active.analyze", return_value={"status": "ok"})
+    @patch("app.main.record_history", return_value={"status": "ok"})
+    @patch("app.main.score", return_value=({"score": 0, "level": "low", "reasons": []}, []))
+    @patch("app.main.subdomains.analyze", return_value={"status": "ok"})
+    @patch("app.main.sitemap.analyze", return_value={"status": "ok"})
+    @patch("app.main.whois.analyze", return_value={"status": "ok"})
+    @patch("app.main.http.analyze", return_value={"status": "ok", "_body": b""})
+    @patch("app.main.tls.analyze", return_value={"status": "ok"})
+    @patch("app.main.rdap.analyze", return_value={"status": "ok"})
+    @patch("app.main.redirects.analyze", return_value={"status": "ok"})
+    @patch("app.main.dns.analyze_ip", return_value={"status": "ok"})
+    @patch("app.main.dns.analyze", return_value={"status": "ok"})
+    @patch("app.main.domain.analyze", return_value={"status": "ok"})
+    def test_active_scan_is_reported_as_current_stage(self, *_mocks):
+        updates = []
+        analyze("example.com", progress_callback=updates.append)
+
+        active_updates = [item for item in updates if item["stage"] == "active_scan"]
+        self.assertEqual([item["status"] for item in active_updates], ["running", "completed"])
+        self.assertEqual(active_updates[0]["completed"], active_updates[1]["completed"])
 
     def test_report_path_uses_safe_domain_and_timestamp(self):
         path = scan._report_path("reports", "https://example.com/login")

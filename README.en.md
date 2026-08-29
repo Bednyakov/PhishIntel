@@ -9,12 +9,18 @@ An autonomous domain intelligence and phishing-risk analysis tool with a JSON re
 ## Usage
 
 ```bash
-python3 scan.py example.com
-python3 scan.py example.com --no-progress
-python3 scan.py example.com --output-dir ./reports
-python3 scan.py example.com --stdout
+python3 main.py
+python3 main.py domain-scan example.com --profile quick
+python3 main.py domain-scan example.com --profile full --stdout
+python3 main.py domain-scan example.com --profile security --active-tool nmap
 python3 -m unittest discover -s tests -v
 ```
+
+Running `python3 main.py` opens the interactive tool menu. The domain tool supports three analysis profiles:
+
+- `quick` — basic network checks without JavaScript, search visibility, or active scanners;
+- `full` — complete analysis with JavaScript, dynamic browser analysis, and search visibility;
+- `security` — extended audit with JavaScript, dynamic analysis, and all active scanners in thorough mode.
 
 Network checks are optional: DNS, HTTP, and TLS errors are returned in the corresponding report sections as `status: unavailable`, so an unavailable service does not stop the complete report.
 
@@ -52,17 +58,15 @@ ASN, organization, country, and city in the IP result are returned as `null` whe
 
 Sitemaps are loaded from `https://<domain>/sitemap.xml`. The analyzer supports `urlset` and `sitemapindex`, with limits of 10 sitemap files, 2 MB per file, and 10,000 URLs. History is stored in the JSONL file `data/history.jsonl`. Change the path with the `PHISHINTEL_HISTORY_FILE` environment variable. The report's `history` field contains DNS/TLS snapshots and changes compared with the previous run. Invalid history lines are ignored.
 
-## CLI options
+## Domain tool options
 
-- `domain` — domain name or URL to analyze;
+- `domain-scan` — domain analysis tool;
+- `target` — domain name or URL to analyze;
+- `--profile` — analysis profile: `quick`, `full`, or `security`;
 - `--timeout` — network-operation timeout in seconds, defaulting to `8.0`;
-- `--compact` — print compact JSON without indentation (reports are pretty-printed by default);
 - `--no-progress` — disable the progress bar;
-- `--output-dir` — directory for JSON reports, defaulting to `reports`;
-- `--stdout` — print JSON to stdout instead of saving it to a file.
-- `--active-tool` — explicitly run an installed active scanner (`nmap`, `nuclei`, or `zap`); repeat the option for multiple tools. Active scanning is disabled without this flag;
-- `--dynamic` — run isolated browser analysis through Playwright when Playwright and Chromium/Chrome are installed;
-- `--search` — query the configured Bing Web Search API for search visibility; the result does not affect the risk score.
+- `--stdout` — print JSON to stdout instead of saving it to a file;
+- `--active-tool` — limit active scanning to selected scanners (`nmap`, `nuclei`, or `zap`); repeat the option for multiple tools. In the `security` profile, omitting this option runs all supported scanners. Thorough Nmap uses a bounded discovery pass followed by service/version, NSE, and OS detection; its separate Nmap budget is at least 300 seconds so the audit is not cut short by the ordinary network timeout. Nuclei runs all available templates at low–critical severity without the quick-scan rate limit. Nmap exploit and brute-force script categories are intentionally excluded. Missing or unconfigured scanners are reported in `active_scan.tools` and do not stop the report.
 
 Lightweight checks additionally inspect security headers and cookie flags, mixed content, sensitive form fields, HTTP/HTTPS form actions, GET forms, dangerous download links, `robots.txt`, and `security.txt`. These are heuristics; a missing CSRF indicator is not proof of a vulnerability.
 
@@ -70,18 +74,18 @@ Reputation checks use the optional `PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY` and `PH
 
 Static JavaScript analysis downloads a bounded number of external scripts, stores metadata and SHA-256 hashes, and checks heuristics such as `eval`, dynamic loading, cookie access, network submissions, and obfuscation. These signals are not proof of malware. Dynamic analysis is enabled only explicitly, does not submit forms, and disables downloads; use it only against systems you are authorized to test.
 
-Active scanners run only with explicit `--active-tool`. Nmap and Nuclei must already be installed in `PATH`; the current ZAP integration reports configuration guidance and does not launch ZAP automatically. Run active checks only against systems you are authorized to test.
+In the `security` profile, active scanners run automatically; use `--active-tool` to limit the set. In thorough mode, Nmap scans all TCP ports, detects services and the operating system, and runs default plus safe `vuln` NSE checks; Nuclei runs all available low–critical templates. ZAP requires a preconfigured daemon/API and reports configuration guidance when unavailable. Nmap exploit and brute-force script categories are intentionally excluded. Run active checks only against systems you are authorized to test.
 
 ```bash
-python3 scan.py example.com --active-tool nmap
-python3 scan.py example.com --active-tool nuclei
-python3 scan.py example.com --active-tool nmap --active-tool nuclei
+python3 main.py domain-scan example.com --profile security --active-tool nmap
+python3 main.py domain-scan example.com --profile security --active-tool nuclei
+python3 main.py domain-scan example.com --profile security --active-tool nmap --active-tool nuclei
 ```
 
-Reports are pretty-printed and structured by default. To reduce the output size, use the inverse `--compact` option, for example:
+Reports are pretty-printed and structured by default. For automation, print JSON to stdout, for example:
 
 ```bash
-python3 scan.py example.com --stdout --compact --no-progress > report.json
+python3 main.py domain-scan example.com --stdout --no-progress > report.json
 ```
 
 The files `wordlists/brands.txt` and `wordlists/phishing_keywords.txt` are used to detect brand mentions and phishing-related phrases in page content. The file `wordlists/subdomains.txt` is used to probe common subdomains through DNS. The lists can be extended one entry per line; blank lines and lines starting with `#` are ignored.
@@ -91,7 +95,7 @@ The report filename is generated from the domain and the UTC start time, for exa
 For automation, explicitly print JSON to stdout:
 
 ```bash
-python3 scan.py example.com --stdout --no-progress > report.json
+python3 main.py domain-scan example.com --stdout --no-progress > report.json
 ```
 
 ## Progress stages

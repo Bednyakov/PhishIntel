@@ -1,12 +1,17 @@
 """Content indicators and lightweight technology detection."""
 
 import hashlib
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qsl, urljoin, urlparse
 
 
 _WORDLIST_DIR = Path(__file__).resolve().parents[2] / "wordlists"
+
+_EMAIL_RE = re.compile(r"(?<![\w.+-])([\w.!#$%&'*+/=?^`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,})(?![\w.-])")
+_PHONE_RE = re.compile(r"(?<!\w)(\+?\d[\d\s().-]{6,}\d)(?!\w)")
+_CONTACT_ATTRIBUTES = ("href", "content", "value", "data-contact", "aria-label", "title")
 
 
 def _load_wordlist(filename: str, fallback: tuple[str, ...] = ()) -> tuple[str, ...]:
@@ -32,6 +37,7 @@ class _PageParser(HTMLParser):
         self.downloads: list[dict] = []
         self.links_count = 0
         self._in_title = False
+        self.contact_values: list[str] = []
 
     @staticmethod
     def _origin(value: str | None) -> tuple[str, str, int | None] | None:
@@ -54,6 +60,7 @@ class _PageParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {key.lower(): value or "" for key, value in attrs}
         tag = tag.lower()
+        self.contact_values.extend(values[key] for key in _CONTACT_ATTRIBUTES if values.get(key))
         if tag == "html":
             self.language = values.get("lang") or None
         elif tag == "title":
@@ -111,12 +118,15 @@ class _PageParser(HTMLParser):
 
 def analyze(http_result: dict) -> dict:
     if http_result.get("status") != "ok":
-        return {"status": "unavailable", "error": http_result.get("error", "HTTP response unavailable"), "title": None, "language": None, "body_length": 0, "sha256": None, "forms": [], "keywords": [], "technologies": [], "external_domains": [], "scripts": [], "links_count": 0, "risk_indicators": []}
+        return {"status": "unavailable", "error": http_result.get("error", "HTTP response unavailable"), "title": None, "language": None, "body_length": 0, "sha256": None, "forms": [], "keywords": [], "technologies": [], "external_domains": [], "scripts": [], "links_count": 0, "contacts": {"emails": [], "phones": [], "other": []}, "risk_indicators": []}
     raw_body = http_result.get("_body", b"")
     body = raw_body.decode("utf-8", errors="replace") if isinstance(raw_body, bytes) else str(raw_body)
     lower = body.lower()
     parser = _PageParser(http_result.get("url"))
     parser.feed(body)
+    emails = sorted({value.lower() for source in (body, *parser.contact_values) for value in _EMAIL_RE.findall(source)})
+    phones = sorted({re.sub(r"\s+", " ", value).strip() for source in (body, *parser.contact_values) for value in _PHONE_RE.findall(source) if sum(char.isdigit() for char in value) >= 7})
+    other_contacts = sorted({value.strip() for value in parser.contact_values if value.startswith(("mailto:", "tel:")) and value.split(":", 1)[1].strip()})
     keywords = _load_wordlist("phishing_keywords.txt", ("password", "sign in", "login", "verify", "wallet", "seed phrase", "recovery phrase"))
     found = sorted({word for word in keywords if word in lower})
     technologies = [name for name, marker in (("WordPress", "wp-content"), ("React", "react"), ("jQuery", "jquery"), ("Cloudflare", "cloudflare")) if marker in lower]
@@ -153,4 +163,4 @@ def analyze(http_result: dict) -> dict:
     mixed_content = sorted({item["url"] for item in parser.resources if page_scheme == "https" and item["scheme"] == "http"})
     if brand_match:
         indicators.append({"name": "brand_reference", "severity": "informational", "description": "Known brand referenced by page", "evidence": brand_match})
-    return {"status": "ok", "title": title, "language": parser.language, "body_length": len(raw_body), "sha256": hashlib.sha256(raw_body if isinstance(raw_body, bytes) else body.encode()).hexdigest(), "forms": parser.forms, "keywords": found, "brand_match": brand_match, "technologies": technologies, "external_domains": sorted(parser.external_domains), "scripts": parser.scripts, "links_count": parser.links_count, "risk_indicators": indicators, "mixed_content": mixed_content, "dangerous_downloads": parser.downloads, "query_parameters": sorted({key for item in parser.resources for key, _ in parse_qsl(urlparse(item["url"]).query) if key.lower() in sensitive_names})}
+    return {"status": "ok", "title": title, "language": parser.language, "body_length": len(raw_body), "sha256": hashlib.sha256(raw_body if isinstance(raw_body, bytes) else body.encode()).hexdigest(), "forms": parser.forms, "keywords": found, "brand_match": brand_match, "technologies": technologies, "external_domains": sorted(parser.external_domains), "scripts": parser.scripts, "links_count": parser.links_count, "contacts": {"emails": emails, "phones": phones, "other": other_contacts}, "risk_indicators": indicators, "mixed_content": mixed_content, "dangerous_downloads": parser.downloads, "query_parameters": sorted({key for item in parser.resources for key, _ in parse_qsl(urlparse(item["url"]).query) if key.lower() in sensitive_names})}
