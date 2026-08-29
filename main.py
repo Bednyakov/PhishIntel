@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -16,6 +17,19 @@ from app.tools.username_search import interactive as interactive_username_search
 
 def _progress(update: dict) -> None:
     scan._render_progress(update)
+
+
+def _print_banner() -> None:
+    """Clear the terminal and print the PhishIntel startup banner."""
+    os.system("cls" if os.name == "nt" else "clear")
+    print("\033[1;31m██████╗ ██╗  ██╗██╗███████╗██╗  ██╗██╗███╗   ██╗████████╗███████╗██╗     ")
+    print("██╔══██╗██║  ██║██║██╔════╝██║  ██║██║████╗  ██║╚══██╔══╝██╔════╝██║     ")
+    print("██████╔╝███████║██║███████╗███████║██║██╔██╗ ██║   ██║   █████╗  ██║     ")
+    print("██╔═══╝ ██╔══██║██║╚════██║██╔══██║██║██║╚██╗██║   ██║   ██╔══╝  ██║     ")
+    print("██║     ██║  ██║██║███████║██║  ██║██║██║ ╚████║   ██║   ███████╗███████╗")
+    print("╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝\033[0m")
+    print("\033[1;34m                 PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL\033[0m")
+    print()
 
 
 def _domain_cli(args: argparse.Namespace) -> dict:
@@ -89,24 +103,35 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _print_banner()
     _register_tools()
     parser = _parser()
     args = parser.parse_args(argv)
     try:
         if args.tool is None:
-            print("\nPhishIntel — выберите инструмент:\n")
-            for index, tool in enumerate(all_tools(), 1):
-                print(f"{index}. {tool.title} — {tool.description}")
-            print("0. Выход")
-            choice = _ask("Ваш выбор", "0")
-            if choice == "0":
-                return 0
-            tool = all_tools()[int(choice) - 1]
-            report = tool.run_interactive()
-            path = _save_report(report)
-            print(f"Инструмент {tool.title} завершён.")
-            print(f"Отчёт сохранён: {path}")
-            return 0
+            while True:
+                print("\nPhishIntel — выберите инструмент:\n")
+                for index, tool in enumerate(all_tools(), 1):
+                    print(f"{index}. {tool.title} — {tool.description}")
+                print("0. Выход")
+                choice = _ask("Ваш выбор", "0")
+                if choice == "0":
+                    return 0
+                try:
+                    tool = all_tools()[int(choice) - 1]
+                except (ValueError, IndexError):
+                    print("Ошибка: выберите номер инструмента из списка.", file=sys.stderr)
+                    continue
+
+                try:
+                    report = tool.run_interactive()
+                    path = _save_report(report)
+                    print(f"Инструмент {tool.title} завершён.")
+                    print(f"Отчёт сохранён: {path}")
+                except (ValueError, OSError) as exc:
+                    print(f"Ошибка при выполнении инструмента: {exc}", file=sys.stderr)
+                input("\nНажмите Enter, чтобы вернуться в главное меню...")
+                _print_banner()
         tool = next((item for item in all_tools() if item.name == args.tool), None)
         if tool is None:
             parser.error(f"неизвестный инструмент: {args.tool}")

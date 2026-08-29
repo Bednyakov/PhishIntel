@@ -151,8 +151,23 @@ def analyze(username: str, timeout: float = 8.0, wordlist: str | Path = DEFAULT_
         remote_error = None
     entries = [dict(item, source=remote_source) for item in entries]
     entries.extend(dict(item, source="local_rules") for item in load_rules(rules))
-    known = {item.get("url") for item in entries}
-    entries.extend({"url": template, "source": "user_wordlist"} for template in load_templates(wordlist) if template not in known)
+
+    # Keep one check per URL template. The local wordlist may intentionally
+    # contain URLs already supplied by remote or local rules, and comparing
+    # only the source would otherwise create duplicate report rows.
+    unique_entries = []
+    known_urls = set()
+    for entry in entries:
+        template = entry.get("url")
+        if not isinstance(template, str) or template in known_urls:
+            continue
+        known_urls.add(template)
+        unique_entries.append(entry)
+    for template in load_templates(wordlist):
+        if template not in known_urls:
+            known_urls.add(template)
+            unique_entries.append({"url": template, "source": "user_wordlist"})
+    entries = unique_entries
     if not entries:
         raise ValueError("username site configuration is empty")
     results = []

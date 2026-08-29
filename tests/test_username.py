@@ -49,6 +49,28 @@ class UsernameTests(unittest.TestCase):
         self.assertEqual({item["source"] for item in report["results"]}, {"remote_sherlock", "local_rules", "user_wordlist"})
 
     @patch("app.analyzers.username._check")
+    def test_duplicate_templates_from_user_wordlist_are_checked_once(self, check):
+        check.side_effect = lambda rule, *args: {
+            "site": rule.get("name", "custom"),
+            "url": rule["url"].replace("{username}", "test_user"),
+            "source": rule.get("source"),
+            "status": "not_found",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "remote.json").write_text("[]", encoding="utf-8")
+            (root / "local.json").write_text(json.dumps([{"name": "GitHub", "url": "https://github.com/{username}"}]), encoding="utf-8")
+            (root / "sites.txt").write_text(
+                "https://github.com/{username}\nhttps://custom.example/{username}\nhttps://custom.example/{username}\n",
+                encoding="utf-8",
+            )
+            with patch("app.analyzers.username.load_remote_rules", return_value=([], "remote_cache")):
+                report = analyze("test_user", wordlist=root / "sites.txt", rules=root / "local.json", remote_cache=root / "remote.json", workers=1)
+        self.assertEqual(report["summary"]["checked"], 2)
+        self.assertEqual(check.call_count, 2)
+        self.assertEqual({item["url"] for item in report["results"]}, {"https://github.com/test_user", "https://custom.example/test_user"})
+
+    @patch("app.analyzers.username._check")
     def test_analyze_and_console_report(self, check):
         check.side_effect = [
             {"site": "example.com", "url": "https://example.com/test_user", "status": "found", "http_status": 200},
