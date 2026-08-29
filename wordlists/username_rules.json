@@ -1,0 +1,10 @@
+[
+  {"name": "GitHub", "url": "https://github.com/{username}", "found_statuses": [200], "not_found_statuses": [404], "negative_strings": ["page not found"]},
+  {"name": "GitLab", "url": "https://gitlab.com/{username}", "found_statuses": [200], "not_found_statuses": [404]},
+  {"name": "Reddit", "url": "https://www.reddit.com/user/{username}", "found_statuses": [200], "not_found_statuses": [404], "negative_strings": ["page not found", "this account has been suspended"]},
+  {"name": "YouTube", "url": "https://www.youtube.com/@{username}", "found_statuses": [200], "not_found_statuses": [404], "negative_strings": ["this page isn't available"]},
+  {"name": "Twitch", "url": "https://www.twitch.tv/{username}", "found_statuses": [200], "not_found_statuses": [404], "negative_strings": ["content not found"]},
+  {"name": "PyPI", "url": "https://pypi.org/user/{username}", "found_statuses": [200], "not_found_statuses": [404]},
+  {"name": "Dev.to", "url": "https://dev.to/{username}", "found_statuses": [200], "not_found_statuses": [404]},
+  {"name": "Medium", "url": "https://medium.com/@{username}", "found_statuses": [200], "not_found_statuses": [404]}
+]

@@ -3,12 +3,15 @@
 
 import argparse
 import json
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import scan
 from app.core.registry import Tool, all_tools, register
 from app.tools.domain_scan import DomainScanOptions, run as run_domain_scan
+from app.tools.username_search import interactive as interactive_username_search, run_cli as run_username_search
 
 
 def _progress(update: dict) -> None:
@@ -45,10 +48,17 @@ def _interactive_domain() -> dict:
 def _register_tools() -> None:
     if not all_tools():
         register(Tool("domain-scan", "Анализ домена", "Проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
+        register(Tool("username-search", "OSINT: поиск username", "Поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
 
 
 def _save_report(report: dict, output_dir: str = "reports") -> Path:
-    path = scan._report_path(output_dir, report["target"])
+    target = str(report["target"])
+    if report.get("tool") == "username-search":
+        safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "username"
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+        path = Path(output_dir) / f"username_{safe_target}_{timestamp}.json"
+    else:
+        path = scan._report_path(output_dir, target)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
@@ -64,6 +74,17 @@ def _parser() -> argparse.ArgumentParser:
     domain.add_argument("--no-progress", action="store_true")
     domain.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"))
     domain.add_argument("--stdout", action="store_true")
+    username = subparsers.add_parser("username-search", help="поиск публичных профилей по username")
+    username.add_argument("username", help="username для проверки")
+    username.add_argument("--timeout", type=float, default=8.0)
+    username.add_argument("--workers", type=int, default=12)
+    username.add_argument("--wordlist", default=None, help="путь к TXT-файлу URL-шаблонов")
+    username.add_argument("--rules", default=None, help="путь к JSON-файлу правил стандартных сайтов")
+    username.add_argument("--offline", action="store_true", help="не загружать удалённый список, использовать кэш")
+    username.add_argument("--update-sites", action="store_true", help="принудительно обновить список Sherlock с GitHub")
+    username.add_argument("--no-progress", action="store_true")
+    username.add_argument("--stdout", action="store_true", help="дополнительно вывести JSON")
+    username.add_argument("--no-color", action="store_true", help="отключить ANSI-цвета в таблице")
     return parser
 
 
@@ -83,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
             tool = all_tools()[int(choice) - 1]
             report = tool.run_interactive()
             path = _save_report(report)
-            print(f"Проверка домена {report['target']} завершена.")
+            print(f"Инструмент {tool.title} завершён.")
             print(f"Отчёт сохранён: {path}")
             return 0
         tool = next((item for item in all_tools() if item.name == args.tool), None)
@@ -94,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             path = _save_report(report)
-            print(f"Проверка домена {report['target']} завершена.")
+            print(f"Инструмент {tool.title} завершён.")
             print(f"Отчёт сохранён: {path}")
         return 0
     except (ValueError, OSError) as exc:
