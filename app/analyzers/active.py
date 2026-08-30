@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 
 TOOLS = ("nmap", "nuclei", "zap")
-_NMAP_THOROUGH_TIMEOUT = 300.0
+_NMAP_THOROUGH_TIMEOUT = 900
 
 _NMAP_PORT = re.compile(r"^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)(?:\s+(.*))?$")
 _RISKY_SERVICES = {
@@ -86,13 +86,13 @@ def _run_nmap_thorough(executable: str, host: str, timeout: float) -> dict:
             result["status"] = "ok" if code == 0 else "completed_with_errors"
             return result
         service_command = [executable, "-Pn", "-p", ports, "-sV", "--version-all", host]
-        output, stderr, code = execute(service_command, max(60.0, timeout * 2))
+        output, stderr, code = execute(service_command, max(60.0, nmap_timeout))
         service = _parse_nmap(output)
         result.update({"ports": service["ports"], "open_ports": service["open_ports"], "open_port_count": service["open_port_count"], "address": service["address"], "reverse_dns": service["reverse_dns"], "output": result.get("output", "") + "\n" + output, "stderr": (result.get("stderr", "") + "\n" + stderr)[-20_000:], "return_code": code})
         phases.append({"name": "service_detection", "status": "ok" if code == 0 else "completed_with_errors"})
         nse_command = [executable, "-Pn", "-p", ports, "--script=default,vuln", host]
         try:
-            output, stderr, code = execute(nse_command, max(60.0, timeout * 2))
+            output, stderr, code = execute(nse_command, nmap_timeout)
         except subprocess.TimeoutExpired as exc:
             phases.append({"name": "nse", "status": "timeout"})
             result["nse_error"] = str(exc)
@@ -105,7 +105,7 @@ def _run_nmap_thorough(executable: str, host: str, timeout: float) -> dict:
         phases.append({"name": "nse", "status": "ok" if code == 0 else "completed_with_errors"})
         if os.geteuid() == 0:
             try:
-                output, stderr, code = execute([executable, "-Pn", "-p", ports, "-O", host], max(60.0, timeout))
+                output, stderr, code = execute([executable, "-Pn", "-p", ports, "-O", host], nmap_timeout)
                 result["os_detection"] = output
                 phases.append({"name": "os_detection", "status": "ok" if code == 0 else "completed_with_errors"})
             except (OSError, subprocess.TimeoutExpired) as exc:
