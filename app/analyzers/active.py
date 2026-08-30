@@ -10,8 +10,28 @@ from urllib.parse import urlparse
 
 TOOLS = ("nmap", "nuclei", "zap")
 _NMAP_THOROUGH_TIMEOUT = 900
+_NMAP_VULN_TIMEOUT = 30
 
 _NMAP_PORT = re.compile(r"^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)(?:\s+(.*))?$")
+_NMAP_DATABASE_PROFILES = {
+    3306: ("mysql", "mysql-*"),
+    5432: ("postgresql", "pgsql-*"),
+    6379: ("redis", "redis-*"),
+    27017: ("mongodb", "mongodb-*"),
+    1433: ("mssql", "ms-sql-*"),
+    1521: ("oracle", "oracle-*"),
+    5984: ("couchdb", "couchdb-*"),
+    9042: ("cassandra", "cassandra-*"),
+}
+
+
+def _nmap_scripts_for_ports(open_ports: list[dict]) -> tuple[str, ...]:
+    scripts = {"default", "vuln"}
+    for item in open_ports:
+        database_profile = _NMAP_DATABASE_PROFILES.get(item["port"])
+        if database_profile:
+            scripts.add(database_profile[1])
+    return tuple(sorted(scripts))
 _RISKY_SERVICES = {
     "ftp": ("high", "FTP is exposed; credentials may be transmitted in cleartext"),
     "telnet": ("high", "Telnet is exposed and does not provide encrypted transport"),
@@ -72,10 +92,8 @@ def _run_nmap_thorough(executable: str, host: str, timeout: float) -> dict:
     result = {"status": "completed_with_errors", "ports": [], "open_ports": [], "findings": [], "nse_scripts": [], "nse_script_count": 0}
     phases = []
     try:
-        # Start with a bounded discovery pass.  A full 1-65535 scan can spend
-        # the whole subprocess timeout on filtered ports and must not prevent
-        # the report from containing the ports already found.
-        discovery = [executable, "-Pn", "--top-ports", "20", "--host-timeout", f"{max(1, int(timeout))}s", host]
+        # Keep discovery bounded; database checks are added only for matching ports.
+        discovery = [executable, "-Pn", "--top-ports", "1000", "--open", "--reason", "--host-timeout", f"{max(1, int(timeout))}s", host]
         output, stderr, code = execute(discovery, nmap_timeout)
         parsed = _parse_nmap(output)
         result.update(parsed, output=output, stderr=stderr, return_code=code)
@@ -88,9 +106,12 @@ def _run_nmap_thorough(executable: str, host: str, timeout: float) -> dict:
         service_command = [executable, "-Pn", "-p", ports, "-sV", "--version-all", host]
         output, stderr, code = execute(service_command, max(60.0, nmap_timeout))
         service = _parse_nmap(output)
+        if not service["ports"] and parsed["ports"]:
+            service = parsed
         result.update({"ports": service["ports"], "open_ports": service["open_ports"], "open_port_count": service["open_port_count"], "address": service["address"], "reverse_dns": service["reverse_dns"], "output": result.get("output", "") + "\n" + output, "stderr": (result.get("stderr", "") + "\n" + stderr)[-20_000:], "return_code": code})
         phases.append({"name": "service_detection", "status": "ok" if code == 0 else "completed_with_errors"})
-        nse_command = [executable, "-Pn", "-p", ports, "--script=default,vuln", host]
+        script_expression = ",".join(_nmap_scripts_for_ports(service["open_ports"]))
+        nse_command = [executable, "-Pn", "-p", ports, f"--script={script_expression}", host]
         try:
             output, stderr, code = execute(nse_command, nmap_timeout)
         except subprocess.TimeoutExpired as exc:
@@ -103,6 +124,16 @@ def _run_nmap_thorough(executable: str, host: str, timeout: float) -> dict:
         result.update({"nse_scripts": nse["nse_scripts"], "nse_script_count": nse["nse_script_count"], "output": result.get("output", "") + "\n" + output, "stderr": (result.get("stderr", "") + "\n" + stderr)[-20_000:]})
         result["findings"].extend(nse["findings"])
         phases.append({"name": "nse", "status": "ok" if code == 0 else "completed_with_errors"})
+        vuln_command = [executable, "-Pn", "-p", ports, "--script=vuln", "--script-timeout", f"{_NMAP_VULN_TIMEOUT}s", host]
+        try:
+            output, stderr, code = execute(vuln_command, _NMAP_VULN_TIMEOUT)
+            vuln = _parse_nmap(output)
+            result["vuln_scan"] = {"status": "ok" if code == 0 else "completed_with_errors", "return_code": code, "nse_scripts": vuln["nse_scripts"], "nse_script_count": vuln["nse_script_count"], "findings": vuln["findings"], "output": output, "stderr": stderr}
+            result["findings"].extend(vuln["findings"])
+            phases.append({"name": "vuln", "status": "ok" if code == 0 else "completed_with_errors"})
+        except subprocess.TimeoutExpired as exc:
+            result["vuln_scan"] = {"status": "timeout", "error": str(exc)}
+            phases.append({"name": "vuln", "status": "timeout"})
         if os.geteuid() == 0:
             try:
                 output, stderr, code = execute([executable, "-Pn", "-p", ports, "-O", host], nmap_timeout)

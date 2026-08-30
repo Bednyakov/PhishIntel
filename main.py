@@ -61,8 +61,8 @@ def _interactive_domain() -> dict:
 
 def _register_tools() -> None:
     if not all_tools():
-        register(Tool("domain-scan", "Анализ домена", "Проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
-        register(Tool("username-search", "OSINT: поиск username", "Поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
+        register(Tool("domain-scan", "Анализ домена", "проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
+        register(Tool("username-search", "OSINT: поиск username", "поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
 
 
 def _save_report(report: dict, output_dir: str = "reports") -> Path:

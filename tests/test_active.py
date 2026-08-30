@@ -40,9 +40,13 @@ PORT     STATE SERVICE VERSION
 
     @patch("app.analyzers.active.subprocess.run")
     @patch("app.analyzers.active.shutil.which", return_value="/usr/bin/nmap")
-    def test_thorough_nmap_uses_full_ports_service_detection_os_and_safe_vuln_nse(self, _which, run):
+    def test_thorough_nmap_uses_bounded_ports_service_detection_and_database_nse(self, _which, run):
         run.return_value.returncode = 0
-        run.return_value.stdout = "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n80/tcp open http\n"
+        run.side_effect = [
+            type("Completed", (), {"returncode": 0, "stdout": "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n3306/tcp open mysql\n", "stderr": ""})(),
+            type("Completed", (), {"returncode": 0, "stdout": "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n3306/tcp open mysql MySQL 8.0\n", "stderr": ""})(),
+            type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+        ]
         run.return_value.stderr = ""
 
         analyze("example.com", tools=("nmap",), thorough=True)
@@ -50,9 +54,12 @@ PORT     STATE SERVICE VERSION
         command = run.call_args_list[0].args[0]
         commands = [call.args[0] for call in run.call_args_list]
         self.assertIn("--top-ports", command)
-        self.assertEqual(run.call_args_list[0].kwargs["timeout"], 300.0)
+        self.assertIn("1000", command)
+        self.assertEqual(run.call_args_list[0].kwargs["timeout"], 900.0)
         self.assertTrue(any("-p" in command and "-sV" in command and "--version-all" in command for command in commands))
-        self.assertTrue(any("--script=default,vuln" in command for command in commands))
+        self.assertTrue(any("--script=default,mysql-*,vuln" in command for command in commands))
+        self.assertTrue(any("--script=vuln" in command and "--script-timeout" in command for command in commands))
+        self.assertFalse(any("http-*" in option or "ssh-*" in option or "ftp-*" in option for command in commands for option in command))
         self.assertNotIn("exploit", " ".join(" ".join(command) for command in commands))
         self.assertNotIn("brute", " ".join(" ".join(command) for command in commands))
 
@@ -74,8 +81,9 @@ PORT     STATE SERVICE VERSION
     @patch("app.analyzers.active.shutil.which", return_value="/usr/bin/nmap")
     def test_thorough_nmap_falls_back_to_top_ports_when_full_scan_has_no_parseable_output(self, _which, run):
         run.side_effect = [
-            type("Completed", (), {"returncode": 0, "stdout": "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n80/tcp open http\n", "stderr": ""})(),
+            subprocess.TimeoutExpired(["nmap"], 240),
             type("Completed", (), {"returncode": 0, "stdout": "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n80/tcp open http Apache httpd 2.4\n", "stderr": ""})(),
+            type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
             type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
         ]
 
@@ -90,7 +98,7 @@ PORT     STATE SERVICE VERSION
     @patch("app.analyzers.active.shutil.which", return_value="/usr/bin/nmap")
     def test_thorough_nmap_timeout_still_returns_service_scan(self, _which, run):
         run.side_effect = [
-            subprocess.TimeoutExpired(["nmap"], 240),
+            type("Completed", (), {"returncode": 0, "stdout": "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n80/tcp open http\n", "stderr": ""})(),
             type("Completed", (), {"returncode": 0, "stdout": "Nmap scan report for example.com (192.0.2.10)\nHost is up.\n80/tcp open http Apache httpd 2.4\n", "stderr": ""})(),
         ]
 
