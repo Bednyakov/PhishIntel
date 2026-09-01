@@ -3,6 +3,7 @@
 import datetime as dt
 import json
 import os
+from .config import env
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,7 @@ _MAX_RECORDS = 50
 
 
 def _path() -> Path:
-    return Path(os.environ.get("PHISHINTEL_HISTORY_FILE", str(_DEFAULT_FILE)))
+    return Path(env("PHISHINTEL_HISTORY_FILE", str(_DEFAULT_FILE)))
 
 
 def _snapshot(dns_result: dict, tls_result: dict) -> dict[str, Any]:

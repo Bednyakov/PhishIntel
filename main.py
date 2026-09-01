@@ -10,10 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import scan
+from app.config import bool_value, env, float_value, int_value, list_value
 from app.core.registry import Tool, all_tools, register
 from app.tools.domain_scan import DomainScanOptions, run as run_domain_scan
 from app.tools.username_search import interactive as interactive_username_search, run_cli as run_username_search
-from app.tools.wallet_check import interactive as interactive_wallet_check, run_cli as run_wallet_check
+from app.tools.resource_parser import interactive as interactive_resource_parser, run_cli as run_resource_parser
 
 
 def _progress(update: dict) -> None:
@@ -63,8 +64,8 @@ def _interactive_domain() -> dict:
 def _register_tools() -> None:
     if not all_tools():
         register(Tool("domain-scan", "Анализ домена", "проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
+        register(Tool("resource-parser", "Парсинг ресурса", "рекурсивный сбор контактных данных со страниц ресурса и поддоменов.", interactive_resource_parser, run_resource_parser))
         register(Tool("username-search", "OSINT: поиск username", "поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
-        register(Tool("wallet-check", "Проверка криптокошелька", "определение сети, валидности и on-chain метрик кошелька.", interactive_wallet_check, run_wallet_check))
 
 
 def _save_report(report: dict, output_dir: str = "reports") -> Path:
@@ -73,10 +74,10 @@ def _save_report(report: dict, output_dir: str = "reports") -> Path:
         safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "username"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
         path = Path(output_dir) / f"username_{safe_target}_{timestamp}.json"
-    elif report.get("tool") == "wallet-check":
+    elif report.get("tool") == "resource-parser":
         safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "wallet"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-        path = Path(output_dir) / f"wallet_{safe_target}_{timestamp}.json"
+        path = Path(output_dir) / f"resource_{safe_target}_{timestamp}.json"
     else:
         path = scan._report_path(output_dir, target)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -89,26 +90,29 @@ def _parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="tool")
     domain = subparsers.add_parser("domain-scan", help="анализ домена")
     domain.add_argument("target", help="домен или URL")
-    domain.add_argument("--profile", choices=("quick", "full", "security"), default="full")
-    domain.add_argument("--timeout", type=float, default=8.0)
-    domain.add_argument("--no-progress", action="store_true")
-    domain.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"))
-    domain.add_argument("--stdout", action="store_true")
+    domain.add_argument("--profile", choices=("quick", "full", "security"), default=env("PHISHINTEL_DOMAIN_PROFILE", "full"))
+    domain.add_argument("--timeout", type=float, default=float_value("PHISHINTEL_TIMEOUT", 8.0))
+    domain.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
+    domain.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"), default=list_value("PHISHINTEL_ACTIVE_TOOLS"))
+    domain.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"))
+    resource = subparsers.add_parser("resource-parser", help="рекурсивный сбор контактных данных ресурса")
+    resource.add_argument("target", help="домен или URL ресурса")
+    resource.add_argument("--timeout", type=float, default=float_value("PHISHINTEL_TIMEOUT", 8.0))
+    resource.add_argument("--max-pages", type=int, default=int_value("PHISHINTEL_RESOURCE_MAX_PAGES", 500))
+    resource.add_argument("--max-depth", type=int, default=int_value("PHISHINTEL_RESOURCE_MAX_DEPTH", 8))
+    resource.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
+    resource.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"))
     username = subparsers.add_parser("username-search", help="поиск публичных профилей по username")
     username.add_argument("username", help="username для проверки")
-    username.add_argument("--timeout", type=float, default=8.0)
-    username.add_argument("--workers", type=int, default=12)
-    username.add_argument("--wordlist", default=None, help="путь к TXT-файлу URL-шаблонов")
-    username.add_argument("--rules", default=None, help="путь к JSON-файлу правил стандартных сайтов")
-    username.add_argument("--offline", action="store_true", help="не загружать удалённый список, использовать кэш")
-    username.add_argument("--update-sites", action="store_true", help="принудительно обновить список Sherlock с GitHub")
-    username.add_argument("--no-progress", action="store_true")
-    username.add_argument("--stdout", action="store_true", help="дополнительно вывести JSON")
-    username.add_argument("--no-color", action="store_true", help="отключить ANSI-цвета в таблице")
-    wallet = subparsers.add_parser("wallet-check", help="проверка криптовалютного кошелька")
-    wallet.add_argument("address", help="адрес криптовалютного кошелька")
-    wallet.add_argument("--timeout", type=float, default=8.0)
-    wallet.add_argument("--stdout", action="store_true", help="вывести JSON в консоль")
+    username.add_argument("--timeout", type=float, default=float_value("PHISHINTEL_TIMEOUT", 8.0))
+    username.add_argument("--workers", type=int, default=int_value("PHISHINTEL_USERNAME_WORKERS", 12))
+    username.add_argument("--wordlist", default=env("PHISHINTEL_USERNAME_WORDLIST") or None, help="путь к TXT-файлу URL-шаблонов")
+    username.add_argument("--rules", default=env("PHISHINTEL_USERNAME_RULES") or None, help="путь к JSON-файлу правил стандартных сайтов")
+    username.add_argument("--offline", action="store_true", default=bool_value("PHISHINTEL_USERNAME_OFFLINE"), help="не загружать удалённый список, использовать кэш")
+    username.add_argument("--update-sites", action="store_true", default=bool_value("PHISHINTEL_USERNAME_UPDATE_SITES"), help="принудительно обновить список Sherlock с GitHub")
+    username.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
+    username.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"), help="дополнительно вывести JSON")
+    username.add_argument("--no-color", action="store_true", default=bool_value("PHISHINTEL_NO_COLOR"), help="отключить ANSI-цвета в таблице")
     return parser
 
 

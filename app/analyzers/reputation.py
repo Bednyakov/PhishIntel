@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+from ..config import bool_value, env
 import ssl
 import urllib.error
 import urllib.parse
@@ -51,7 +52,7 @@ def _entities(target: str, http_result: dict, redirects: dict, content: dict, ip
 
 
 def _google_safe_browsing(value: str, timeout: float) -> dict:
-    key = os.getenv("PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY")
+    key = env("PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY")
     if not key:
         return {"name": "google_safe_browsing", "status": "not_configured"}
     payload = {"client": {"clientId": "phishintel", "clientVersion": "1.0"}, "threatInfo": {"threatTypes": ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"], "platformTypes": ["ANY_PLATFORM"], "threatEntryTypes": ["URL"], "threatEntries": [{"url": value}]}}
@@ -66,7 +67,7 @@ def _google_safe_browsing(value: str, timeout: float) -> dict:
 
 
 def _virustotal(value: str, entity_type: str, timeout: float) -> dict:
-    key = os.getenv("PHISHINTEL_VIRUSTOTAL_KEY")
+    key = env("PHISHINTEL_VIRUSTOTAL_KEY")
     if not key:
         return {"name": "virustotal", "status": "not_configured"}
     if entity_type == "ip":
@@ -104,12 +105,12 @@ def analyze(target: str, http_result: dict, redirects: dict, content: dict, ip_r
     for entity in _entities(target, http_result, redirects, content, ip_result):
         value, entity_type = entity["value"], entity["type"]
         providers = []
-        if os.getenv("PHISHINTEL_VIRUSTOTAL_KEY"):
+        if env("PHISHINTEL_VIRUSTOTAL_KEY"):
             providers.append(_virustotal(value, entity_type, timeout))
         if entity_type in {"url", "domain"}:
-            if os.getenv("PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY"):
+            if env("PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY"):
                 providers.append(_google_safe_browsing(value if entity_type == "url" else f"https://{value}/", timeout))
-            if entity_type == "url" and os.getenv("PHISHINTEL_URLHAUS_ENABLED", "").lower() in {"1", "true", "yes"}:
+            if entity_type == "url" and bool_value("PHISHINTEL_URLHAUS_ENABLED"):
                 providers.append(_urlhaus(value, timeout))
         if providers:
             entities.append({**entity, "providers": providers})

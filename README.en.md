@@ -19,7 +19,7 @@ python3 main.py
 python3 main.py domain-scan example.com --profile quick
 python3 main.py domain-scan example.com --profile full --stdout
 python3 main.py domain-scan example.com --profile security --active-tool nmap
-python3 main.py wallet-check 0x0000000000000000000000000000000000000000
+python3 main.py resource-parser https://example.com --stdout
 python3 -m unittest discover -s tests -v
 ```
 
@@ -56,17 +56,17 @@ While the scan is running, the CLI displays a progress bar in `stderr`, showing 
 - configurable reputation checks for domains, URLs, IP addresses, form actions, and external resources;
 - bounded static JavaScript analysis and optional isolated browser observation;
 - optional search-visibility OSINT, which is not a standalone risk verdict.
-- cryptocurrency wallet checks: chain, address type, validity, and available on-chain metrics.
+- recursive resource parsing for publicly exposed contact data.
 
-### Cryptocurrency wallet check
+### Resource parser
 
 ```bash
-python3 main.py wallet-check <address> --stdout
+python3 main.py resource-parser https://example.com --stdout
 ```
 
-The report is saved as `reports/wallet_<address>_<timestamp>.json` and a summary is printed to the console. Bitcoin/Ethereum transaction data uses Blockchair; set `PHISHINTEL_BLOCKCHAIR_KEY` for a production API key. If the provider is unavailable, the report is still produced with unavailable values set to `null` and the reason recorded in `source`. Ethereum/EVM, Bitcoin, Solana, and TRON addresses are identified locally; historical and USD metrics depend on the configured provider.
+The parser recursively visits HTML pages of the resource and discovered subdomains, collecting emails, phone numbers, cryptocurrency wallets, and strings that look like physical addresses. Each value is associated with its source page. The default limits are 500 pages and depth 8; use `--max-pages` and `--max-depth` to change them.
 
-A keyword alone receives an `informational` severity. The severity increases only when additional form, brand, or external `action` context is present.
+For safety, crawling is limited to the original domain and its subdomains; external domains are not visited and binary files are skipped.
 
 Subdomain discovery uses two available sources: Certificate Transparency (`crt.sh`) and brute force against `wordlists/subdomains.txt`. The `passive_dns` field and a separate DNS source are part of the report contract, but require an external passive-DNS API.
 
@@ -77,6 +77,7 @@ Sitemaps are loaded from `https://<domain>/sitemap.xml`. The analyzer supports `
 ## Domain tool options
 
 - `domain-scan` — domain analysis tool;
+- `resource-parser` — recursive resource contact-data collection;
 - `target` — domain name or URL to analyze;
 - `--profile` — analysis profile: `quick`, `full`, or `security`;
 - `--timeout` — network-operation timeout in seconds, defaulting to `8.0`;
@@ -86,7 +87,12 @@ Sitemaps are loaded from `https://<domain>/sitemap.xml`. The analyzer supports `
 
 Lightweight checks additionally inspect security headers and cookie flags, mixed content, sensitive form fields, HTTP/HTTPS form actions, GET forms, dangerous download links, `robots.txt`, and `security.txt`. These are heuristics; a missing CSRF indicator is not proof of a vulnerability.
 
-Reputation checks use the optional `PHISHINTEL_GOOGLE_SAFE_BROWSING_KEY` and `PHISHINTEL_VIRUSTOTAL_KEY` environment variables; unconfigured providers are omitted from the report. Search visibility uses `PHISHINTEL_BING_KEY`; its block is added only when `--search` is used with a configured key. External URLs have query parameters removed before reputation checks so that potential tokens are not sent to providers.
+All application settings are configured in `.env`. Copy `.env.example` to `.env` and fill in the required values. The file contains API keys, timeouts, resource-parser limits, domain profile, active scanners, username options, JSON/progress/color output settings, and the history path. Unconfigured providers are omitted from reports. Explicit CLI arguments take precedence over `.env`.
+
+```bash
+cp .env.example .env
+python3 main.py resource-parser https://example.com
+```
 
 Static JavaScript analysis downloads a bounded number of external scripts, stores metadata and SHA-256 hashes, and checks heuristics such as `eval`, dynamic loading, cookie access, network submissions, and obfuscation. These signals are not proof of malware. Dynamic analysis is enabled only explicitly, does not submit forms, and disables downloads; use it only against systems you are authorized to test.
 

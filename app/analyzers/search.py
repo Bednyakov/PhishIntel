@@ -2,13 +2,14 @@
 
 import json
 import os
+from ..config import env
 import ssl
 import urllib.parse
 import urllib.request
 
 
 def analyze(domain: str, timeout: float = 8.0) -> dict:
-    key = os.getenv("PHISHINTEL_BING_KEY")
+    key = env("PHISHINTEL_BING_KEY")
     if not key:
         return {"status": "not_configured", "risk_weight": 0, "reason": "Search provider is not configured"}
     query = f"site:{domain}"
