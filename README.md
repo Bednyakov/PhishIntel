@@ -18,12 +18,13 @@
 python3 main.py
 ```
 
-Для прямого запуска анализа домена:
+Для прямого запуска анализа:
 
 ```bash
 python3 main.py domain-scan example.com --profile quick
 python3 main.py domain-scan example.com --profile full --stdout
 python3 main.py domain-scan example.com --profile security --active-tool nmap
+python3 main.py wallet-check 0x0000000000000000000000000000000000000000
 python3 -m unittest discover -s tests -v
 ```
 
@@ -60,6 +61,15 @@ python3 -m unittest discover -s tests -v
 - настраиваемая проверка репутации доменов, URL, IP, адресов отправки форм и внешних ресурсов;
 - ограниченный статический анализ JavaScript и опциональное изолированное наблюдение в браузере;
 - опциональный OSINT-анализ поисковой видимости, который не является самостоятельным вердиктом о риске.
+- проверка криптокошельков: сеть, тип адреса, валидность и доступные on-chain метрики.
+
+### Проверка криптокошелька
+
+```bash
+python3 main.py wallet-check <адрес> --stdout
+```
+
+Отчёт сохраняется в `reports/wallet_<адрес>_<timestamp>.json`, а сводка выводится в консоль. Для транзакционных данных Bitcoin/Ethereum используется Blockchair; задайте `PHISHINTEL_BLOCKCHAIR_KEY` для рабочего API-ключа. Без ключа или при недоступности провайдера отчет всё равно формируется, но недоступные значения обозначаются `null`, а причина указывается в `source`. Локально распознаются Ethereum/EVM, Bitcoin, Solana и TRON; исторические и USD-метрики зависят от подключенного провайдера.
 
 Одно ключевое слово само по себе имеет уровень `informational`; уровень повышается только при наличии контекста формы, бренда или внешнего `action`.
 

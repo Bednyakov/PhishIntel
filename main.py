@@ -13,6 +13,7 @@ import scan
 from app.core.registry import Tool, all_tools, register
 from app.tools.domain_scan import DomainScanOptions, run as run_domain_scan
 from app.tools.username_search import interactive as interactive_username_search, run_cli as run_username_search
+from app.tools.wallet_check import interactive as interactive_wallet_check, run_cli as run_wallet_check
 
 
 def _progress(update: dict) -> None:
@@ -63,6 +64,7 @@ def _register_tools() -> None:
     if not all_tools():
         register(Tool("domain-scan", "Анализ домена", "проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
         register(Tool("username-search", "OSINT: поиск username", "поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
+        register(Tool("wallet-check", "Проверка криптокошелька", "определение сети, валидности и on-chain метрик кошелька.", interactive_wallet_check, run_wallet_check))
 
 
 def _save_report(report: dict, output_dir: str = "reports") -> Path:
@@ -71,6 +73,10 @@ def _save_report(report: dict, output_dir: str = "reports") -> Path:
         safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "username"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
         path = Path(output_dir) / f"username_{safe_target}_{timestamp}.json"
+    elif report.get("tool") == "wallet-check":
+        safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "wallet"
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+        path = Path(output_dir) / f"wallet_{safe_target}_{timestamp}.json"
     else:
         path = scan._report_path(output_dir, target)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +105,10 @@ def _parser() -> argparse.ArgumentParser:
     username.add_argument("--no-progress", action="store_true")
     username.add_argument("--stdout", action="store_true", help="дополнительно вывести JSON")
     username.add_argument("--no-color", action="store_true", help="отключить ANSI-цвета в таблице")
+    wallet = subparsers.add_parser("wallet-check", help="проверка криптовалютного кошелька")
+    wallet.add_argument("address", help="адрес криптовалютного кошелька")
+    wallet.add_argument("--timeout", type=float, default=8.0)
+    wallet.add_argument("--stdout", action="store_true", help="вывести JSON в консоль")
     return parser
 
 

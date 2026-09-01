@@ -19,6 +19,7 @@ python3 main.py
 python3 main.py domain-scan example.com --profile quick
 python3 main.py domain-scan example.com --profile full --stdout
 python3 main.py domain-scan example.com --profile security --active-tool nmap
+python3 main.py wallet-check 0x0000000000000000000000000000000000000000
 python3 -m unittest discover -s tests -v
 ```
 
@@ -55,6 +56,15 @@ While the scan is running, the CLI displays a progress bar in `stderr`, showing 
 - configurable reputation checks for domains, URLs, IP addresses, form actions, and external resources;
 - bounded static JavaScript analysis and optional isolated browser observation;
 - optional search-visibility OSINT, which is not a standalone risk verdict.
+- cryptocurrency wallet checks: chain, address type, validity, and available on-chain metrics.
+
+### Cryptocurrency wallet check
+
+```bash
+python3 main.py wallet-check <address> --stdout
+```
+
+The report is saved as `reports/wallet_<address>_<timestamp>.json` and a summary is printed to the console. Bitcoin/Ethereum transaction data uses Blockchair; set `PHISHINTEL_BLOCKCHAIR_KEY` for a production API key. If the provider is unavailable, the report is still produced with unavailable values set to `null` and the reason recorded in `source`. Ethereum/EVM, Bitcoin, Solana, and TRON addresses are identified locally; historical and USD metrics depend on the configured provider.
 
 A keyword alone receives an `informational` severity. The severity increases only when additional form, brand, or external `action` context is present.
 
