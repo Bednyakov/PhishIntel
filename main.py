@@ -15,6 +15,7 @@ from app.core.registry import Tool, all_tools, register
 from app.tools.domain_scan import DomainScanOptions, run as run_domain_scan
 from app.tools.username_search import interactive as interactive_username_search, run_cli as run_username_search
 from app.tools.resource_parser import interactive as interactive_resource_parser, run_cli as run_resource_parser
+from app.tools.email import interactive as interactive_email_check, run_cli as run_email_check
 
 
 def _progress(update: dict) -> None:
@@ -66,6 +67,7 @@ def _register_tools() -> None:
         register(Tool("domain-scan", "Анализ домена", "проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
         register(Tool("resource-parser", "Парсинг ресурса", "рекурсивный сбор контактных данных со страниц ресурса и поддоменов.", interactive_resource_parser, run_resource_parser))
         register(Tool("username-search", "OSINT: поиск username", "поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
+        register(Tool("email-check", "Проверка email", "полная проверка email: валидация, DNS/SMTP и поиск аккаунта по сайтам.", interactive_email_check, run_email_check))
 
 
 def _save_report(report: dict, output_dir: str = "reports") -> Path:
@@ -74,10 +76,11 @@ def _save_report(report: dict, output_dir: str = "reports") -> Path:
         safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "username"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
         path = Path(output_dir) / f"username_{safe_target}_{timestamp}.json"
-    elif report.get("tool") == "resource-parser":
+    elif report.get("tool") in {"resource-parser", "email-search", "email-check"}:
         safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", target).strip("._") or "wallet"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-        path = Path(output_dir) / f"resource_{safe_target}_{timestamp}.json"
+        prefix = "resource" if report.get("tool") == "resource-parser" else "email"
+        path = Path(output_dir) / f"{prefix}_{safe_target}_{timestamp}.json"
     else:
         path = scan._report_path(output_dir, target)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -113,6 +116,35 @@ def _parser() -> argparse.ArgumentParser:
     username.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
     username.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"), help="дополнительно вывести JSON")
     username.add_argument("--no-color", action="store_true", default=bool_value("PHISHINTEL_NO_COLOR"), help="отключить ANSI-цвета в таблице")
+    email = subparsers.add_parser("email-check", help="локальная проверка email без внешних API")
+    email.add_argument("email", help="email-адрес для проверки")
+    email.add_argument("--timeout", type=float, default=float_value("PHISHINTEL_TIMEOUT", 8.0))
+    email.add_argument("--rules", default=env("PHISHINTEL_EMAIL_RULES") or None, help="путь к JSON-файлу правил доменов")
+    email.add_argument("--disposable", default=env("PHISHINTEL_EMAIL_DISPOSABLE") or None, help="путь к JSON-списку disposable-доменов")
+    email.add_argument("--smtp", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SMTP"), help=argparse.SUPPRESS)
+    email.add_argument("--search-rules", default=env("PHISHINTEL_EMAIL_SEARCH_RULES") or None, help="путь к JSON-файлу правил поиска аккаунтов")
+    email.add_argument("--remote-cache", default=env("PHISHINTEL_EMAIL_SEARCH_CACHE") or None, help="путь к кэшу каталога MailAccess")
+    email.add_argument("--workers", type=int, default=int_value("PHISHINTEL_EMAIL_SEARCH_WORKERS", 12))
+    email.add_argument("--offline", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SEARCH_OFFLINE"))
+    email.add_argument("--update-sites", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SEARCH_UPDATE_SITES"))
+    email.add_argument("--include-disabled", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SEARCH_INCLUDE_DISABLED"))
+    email.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
+    email.add_argument("--no-color", action="store_true", default=bool_value("PHISHINTEL_NO_COLOR"), help="отключить ANSI-цвета")
+    email.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"), help="вывести JSON")
+    # Compatibility command: the unified checker is now the canonical email flow.
+    email_search_parser = subparsers.add_parser("email-search", help=argparse.SUPPRESS)
+    email_search_parser.add_argument("email")
+    email_search_parser.add_argument("--timeout", type=float, default=float_value("PHISHINTEL_TIMEOUT", 8.0))
+    email_search_parser.set_defaults(rules=None, disposable=None, smtp=True)
+    email_search_parser.add_argument("--rules", dest="search_rules", default=env("PHISHINTEL_EMAIL_SEARCH_RULES") or None)
+    email_search_parser.add_argument("--remote-cache", default=env("PHISHINTEL_EMAIL_SEARCH_CACHE") or None)
+    email_search_parser.add_argument("--workers", type=int, default=int_value("PHISHINTEL_EMAIL_SEARCH_WORKERS", 12))
+    email_search_parser.add_argument("--offline", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SEARCH_OFFLINE"))
+    email_search_parser.add_argument("--update-sites", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SEARCH_UPDATE_SITES"))
+    email_search_parser.add_argument("--include-disabled", action="store_true", default=bool_value("PHISHINTEL_EMAIL_SEARCH_INCLUDE_DISABLED"))
+    email_search_parser.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
+    email_search_parser.add_argument("--no-color", action="store_true", default=bool_value("PHISHINTEL_NO_COLOR"))
+    email_search_parser.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"))
     return parser
 
 

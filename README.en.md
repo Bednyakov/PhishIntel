@@ -57,6 +57,36 @@ While the scan is running, the CLI displays a progress bar in `stderr`, showing 
 - bounded static JavaScript analysis and optional isolated browser observation;
 - optional search-visibility OSINT, which is not a standalone risk verdict.
 - recursive resource parsing for publicly exposed contact data.
+- local email checks without third-party APIs: syntax, disposable domains, role accounts, DNS/MX, and local domain rules.
+
+### Email checker
+
+```bash
+python3 main.py email-check user@example.com --stdout
+```
+
+The checker does not call breach, enrichment, or social-network APIs. It
+normalizes the address, checks syntax, consults the bundled MailAccess-derived
+disposable-domain corpus, classifies role accounts, resolves DNS information,
+and applies `wordlists/email_rules.json`. An MX record only means that the
+domain advertises mail exchangers; it does not prove that the mailbox exists.
+
+SMTP probing is opt-in with `--smtp`. It performs a limited `RCPT TO` probe
+against the domain MX server and may return `greylisted`, `uncertain`, or a
+catch-all result; it is not proof of mailbox existence.
+
+### Email account search
+
+```bash
+python3 main.py email-search user@example.com --stdout
+```
+
+This checks account-existence indicators on sites described by the local
+`wordlists/email_search_rules.json` catalog. GET and POST requests, JSON
+payloads, headers, HTTP statuses, and response markers are supported. The
+catalog is based on MailAccess email-only rules; disabled or malformed rules
+are skipped. `found` means only that the response matched the configured rule,
+not that the address owner was confirmed.
 
 ### Resource parser
 
