@@ -3,6 +3,8 @@
 
 import argparse
 import json
+import random
+import time
 import os
 import re
 import sys
@@ -20,18 +22,94 @@ from app.tools.email import interactive as interactive_email_check, run_cli as r
 
 def _progress(update: dict) -> None:
     scan._render_progress(update)
-
+    
 
 def _print_banner() -> None:
-    """Clear the terminal and print the PhishIntel startup banner."""
+    """Clear terminal and print animated PhishIntel startup banner."""
+
     os.system("cls" if os.name == "nt" else "clear")
-    print("\033[1;31m██████╗ ██╗  ██╗██╗███████╗██╗  ██╗██╗███╗   ██╗████████╗███████╗██╗     ")
-    print("██╔══██╗██║  ██║██║██╔════╝██║  ██║██║████╗  ██║╚══██╔══╝██╔════╝██║     ")
-    print("██████╔╝███████║██║███████╗███████║██║██╔██╗ ██║   ██║   █████╗  ██║     ")
-    print("██╔═══╝ ██╔══██║██║╚════██║██╔══██║██║██║╚██╗██║   ██║   ██╔══╝  ██║     ")
-    print("██║     ██║  ██║██║███████║██║  ██║██║██║ ╚████║   ██║   ███████╗███████╗")
-    print("╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝\033[0m")
-    print("\033[1;34m                 PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL\033[0m")
+
+    banner = [
+        "██████╗ ██╗  ██╗██╗███████╗██╗  ██╗██╗███╗   ██╗████████╗███████╗██╗     ",
+        "██╔══██╗██║  ██║██║██╔════╝██║  ██║██║████╗  ██║╚══██╔══╝██╔════╝██║     ",
+        "██████╔╝███████║██║███████╗███████║██║██╔██╗ ██║   ██║   █████╗  ██║     ",
+        "██╔═══╝ ██╔══██║██║╚════██║██╔══██║██║██║╚██╗██║   ██║   ██╔══╝  ██║     ",
+        "██║     ██║  ██║██║███████║██║  ██║██║██║ ╚████║   ██║   ███████╗███████╗",
+        "╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝",
+    ]
+
+    RED = "\033[1;31m"
+    DARK_RED = "\033[31m"
+    BLUE = "\033[1;34m"
+    CYAN = "\033[36m"
+    RESET = "\033[0m"
+
+    # Основной баннер
+    for line in banner:
+        print(f"{RED}{line}{RESET}")
+
+    print(f"{BLUE}                 PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL{RESET}")
+    print()
+
+    # Начальные позиции "капель"
+    drops = [
+        [1, 18],
+        [2, 35],
+        [2, 61],
+        [3, 10],
+        [4, 48],
+        [4, 72],
+        [5, 27],
+    ]
+
+    # Перемещаем курсор ниже баннера
+    print("\033[1B", end="")
+
+    # Анимация стекания
+    for frame in range(18):
+        # Возвращаемся к началу области капель
+        print(f"\033[{frame + 1}A", end="")
+
+        for row, col in drops:
+            y = frame // 2 + random.choice([0, 0, 1])
+
+            # Курсор в позицию капли
+            print(f"\033[{row + y};{col}H", end="")
+
+            # Разные стадии капли
+            if frame % 4 == 0:
+                print(f"{DARK_RED}│{RESET}", end="")
+            elif frame % 4 == 1:
+                print(f"{RED}▼{RESET}", end="")
+            elif frame % 4 == 2:
+                print(f"{RED}●{RESET}", end="")
+            else:
+                print(" ", end="")
+
+        time.sleep(0.08)
+
+    # Финальный эффект — несколько капель падают вниз
+    print("\033[10;1H", end="")
+
+    print(
+        f"{DARK_RED}"
+        "                    │  │   ▼   │    ●"
+        f"{RESET}"
+    )
+
+    time.sleep(0.15)
+
+    # Статус запуска
+    print(
+        f"\033[1;32m"
+        "                    [✓] Intelligence engine initialized"
+        f"{RESET}"
+    )
+    print(
+        f"{CYAN}"
+        "                    [→] Starting PhishIntel..."
+        f"{RESET}"
+    )
     print()
 
 
