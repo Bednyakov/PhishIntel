@@ -1,0 +1,295 @@
+[
+  {
+    "name": "Notion",
+    "url": "https://www.notion.so/api/v3/getLoginOptions",
+    "method": "POST",
+    "payload": {
+      "email": "{username}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      404
+    ],
+    "found_strings": "\"hasAccount\":true",
+    "not_found_strings": "\"hasAccount\":false",
+    "disabled": true,
+    "disabled_reason": "Current API returns validation errors for otherwise valid email input.",
+    "pre_check": {
+      "url": "https://www.notion.so/login",
+      "method": "GET",
+      "extract_cookie": true,
+      "extract_csrf": "meta[name='csrf-token']"
+    },
+    "category": "misc",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Spotify",
+    "url": "https://spclient.wg.spotify.com/signup/public/v1/account?validate=1&email={username}",
+    "method": "GET",
+    "payload": null,
+    "headers": {},
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      200
+    ],
+    "found_strings": "\"status\":20",
+    "not_found_strings": "\"status\":1",
+    "disabled": false,
+    "disabled_reason": null,
+    "pre_check": {
+      "url": "https://www.spotify.com/signup",
+      "method": "GET",
+      "extract_cookie": true,
+      "extract_csrf": "meta[name='csrf-token']"
+    },
+    "category": "music",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "NetShoes",
+    "url": "https://www.netshoes.com.br/auth/account/exists/{username}",
+    "method": "GET",
+    "payload": null,
+    "headers": {},
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      404
+    ],
+    "found_strings": "\"exists\":true",
+    "not_found_strings": "\"email\"",
+    "disabled": true,
+    "disabled_reason": "Endpoint is consistently blocked by the live WAF (HTTP 403).",
+    "pre_check": null,
+    "category": "shopping",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "OLX",
+    "url": "https://apigw.olx.com.br/v0/user/login/check_email",
+    "method": "POST",
+    "payload": {
+      "email": "{username}"
+    },
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Olx-Team-Key": "5XzjuCgmYE7qMlYpsLZbTvm98ik4CS4a"
+    },
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      401
+    ],
+    "found_strings": "EMAIL",
+    "not_found_strings": "ACCOUNT_NOT_FOUND",
+    "disabled": true,
+    "disabled_reason": "Endpoint is consistently blocked by the live WAF (HTTP 403).",
+    "pre_check": null,
+    "category": "shopping",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Milanuncios",
+    "url": "https://userprofiles.gw.milanuncios.com/api/v2/users",
+    "method": "POST",
+    "payload": {
+      "name": "SAsASA",
+      "password": "1234561",
+      "email": "{username}",
+      "isConsentApproved": "true",
+      "sellerType": "PRIVATE",
+      "role": "USER"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "found_statuses": [
+      409
+    ],
+    "not_found_statuses": [
+      400
+    ],
+    "found_strings": "user-profiles.email-already-exists",
+    "not_found_strings": "user-profiles.invalid-password",
+    "disabled": true,
+    "disabled_reason": "Endpoint is consistently blocked by the live WAF (HTTP 403).",
+    "pre_check": null,
+    "category": "shopping",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "El Mundo",
+    "url": "https://seguro.elmundo.es/ueregistro/v2/usuarios/registro",
+    "method": "POST",
+    "payload": {
+      "email": "{username}",
+      "pass": "11",
+      "portal": 8,
+      "aceptaCondicionesLegales": true,
+      "aceptaEsMayorDeDieciseis": true,
+      "comunicacionesComerciales": [],
+      "rid": null,
+      "csp": null,
+      "urlOrigen": "",
+      "movil": "",
+      "aceptaSuscripcionClub": false,
+      "pianoTrackingId": null
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "found_statuses": [
+      400
+    ],
+    "not_found_statuses": [
+      400
+    ],
+    "found_strings": "\"codigo\":\"176\"",
+    "not_found_strings": "\"codigo\":\"001\"",
+    "disabled": false,
+    "disabled_reason": null,
+    "pre_check": null,
+    "category": "shopping",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Picsart",
+    "url": "https://api.picsart.com/users/email/existence?email_encoded=0&emails={username}",
+    "method": "GET",
+    "payload": null,
+    "headers": {},
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      404
+    ],
+    "found_strings": "\"response\":[\"",
+    "not_found_strings": "\"registration_flow\"",
+    "disabled": true,
+    "disabled_reason": "Endpoint is consistently blocked by the live WAF (HTTP 403).",
+    "pre_check": null,
+    "category": "art",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Eventbrite",
+    "url": "https://www.eventbrite.com/api/v3/users/lookup/",
+    "method": "POST",
+    "payload": {
+      "email": "{username}",
+      "source_user_id": "",
+      "source_provider": ""
+    },
+    "headers": {
+      "X-Csrftoken": "{csrftoken_value}",
+      "Referer": "https://www.eventbrite.com/",
+      "Content-Type": "application/json"
+    },
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      200
+    ],
+    "found_strings": "\"exists\":true",
+    "not_found_strings": "\"exists\":false",
+    "disabled": false,
+    "disabled_reason": null,
+    "pre_check": {
+      "url": "https://www.eventbrite.com/",
+      "method": "GET",
+      "extract_cookie": true,
+      "cookie_name": "csrftoken",
+      "extract_csrf": "meta[name='csrf-token']"
+    },
+    "category": "social",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Imageshack",
+    "url": "https://imageshack.com/rest_api/v2/user",
+    "method": "POST",
+    "payload": "email={username}&username=user&password=1&set_cookies=true",
+    "headers": {},
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      401
+    ],
+    "found_strings": "user",
+    "not_found_strings": "Invalid",
+    "disabled": true,
+    "disabled_reason": "Endpoint response no longer matches Blackbird's documented markers.",
+    "pre_check": null,
+    "category": "images",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Chess.com",
+    "url": "https://www.chess.com/callback/email/available?email={username}",
+    "method": "GET",
+    "payload": null,
+    "headers": {},
+    "found_statuses": [
+      226
+    ],
+    "not_found_statuses": [
+      200
+    ],
+    "found_strings": "\"isEmailAvailable\":false",
+    "not_found_strings": "\"isEmailAvailable\":true",
+    "disabled": false,
+    "disabled_reason": null,
+    "pre_check": {
+      "url": "https://www.chess.com/register",
+      "method": "GET",
+      "extract_cookie": true,
+      "extract_csrf": "meta[name='csrf-token']"
+    },
+    "category": "gaming",
+    "source": "mailaccess_remote"
+  },
+  {
+    "name": "Adobe",
+    "url": "https://auth.services.adobe.com/signin/v2/users/accounts",
+    "method": "POST",
+    "payload": {
+      "username": "{username}",
+      "usernameType": "EMAIL"
+    },
+    "headers": {
+      "X-Ims-Clientid": "homepage_milo",
+      "Content-Type": "application/json"
+    },
+    "found_statuses": [
+      200
+    ],
+    "not_found_statuses": [
+      200
+    ],
+    "found_strings": "authenticationMethods",
+    "not_found_strings": "[]",
+    "disabled": false,
+    "disabled_reason": null,
+    "pre_check": {
+      "url": "https://auth.services.adobe.com/sign-in",
+      "method": "GET",
+      "extract_cookie": true,
+      "extract_csrf": "meta[name='csrf-token']"
+    },
+    "category": "misc",
+    "source": "mailaccess_remote"
+  }
+]

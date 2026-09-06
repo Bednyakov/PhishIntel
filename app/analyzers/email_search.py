@@ -60,7 +60,7 @@ def _parse_catalog(payload: Any, source: str) -> list[dict[str, Any]]:
 def load_rules(path: str | Path = DEFAULT_RULES, include_disabled: bool = False) -> list[dict[str, Any]]:
     rules_path = Path(path)
     if not rules_path.is_file():
-        raise OSError(f"email search rules not found: {rules_path}")
+        return []
     payload = json.loads(rules_path.read_text(encoding="utf-8"))
     result = _parse_catalog(payload, "local_rules")
     if not include_disabled:

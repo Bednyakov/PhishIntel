@@ -33,6 +33,14 @@ class EmailSearchTests(unittest.TestCase):
             self.assertEqual([item["name"] for item in load_rules(path, include_disabled=False)], ["Active"])
             self.assertEqual({item["name"] for item in load_rules(path, include_disabled=True)}, {"Active", "Disabled"})
 
+    def test_missing_local_rules_are_optional(self):
+        self.assertEqual(load_rules("/tmp/phishintel-missing-email-search-rules.json"), [])
+
+    @patch("app.analyzers.email_search.load_remote_rules", return_value=([{"name": "Remote", "url": "https://remote.example/{email}", "method": "GET", "found_statuses": [200], "not_found_statuses": [404]}], "mailaccess_remote"))
+    def test_remote_rules_work_without_local_rules(self, _remote):
+        report = analyze("test@example.com", rules="/tmp/phishintel-missing-email-search-rules.json", remote_cache="/tmp/phishintel-cache.json", offline=False, workers=1, session_factory=FakeSession)
+        self.assertEqual(report["summary"]["catalog_rules"], 1)
+
     @patch("app.analyzers.email_search.requests.get")
     def test_remote_catalog_is_converted_and_cached(self, get):
         response = get.return_value
