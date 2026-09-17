@@ -9,10 +9,13 @@ import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
+from functools import partial
 from http import cookiejar
+from itertools import cycle
 from typing import Any
 from urllib.parse import parse_qsl
 
+from ..config import list_value
 from .common import normalize_target
 from ..history import record as record_history
 from . import dns, port_scan, rdap, redirects, subdomains, tls, whois
@@ -21,6 +24,8 @@ _MAX_PAGES = 500
 _MAX_DEPTH = 8
 _MAX_BYTES = 2_000_000
 _USER_AGENT = "phishintel/1.0 resource-contact-parser"
+_USER_AGENTS = "PHISHINTEL_RESOURCE_USER_AGENTS"
+_PROXIES = "PHISHINTEL_RESOURCE_PROXIES"
 _EMAIL = re.compile(r"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,63}", re.I)
 _PHONE_RU = re.compile(r"(?<![\d\w])(?:\+7|8)[\s(.-]*\d{3}[\s)./-]*\d{3}[\s.-]*\d{2}[\s.-]*\d{2}(?!\d)")
 _PHONE_US = re.compile(r"(?<![\d\w])(?:\+?1[\s.-]*)?(?:\([2-9]\d{2}\)|[2-9]\d{2})[\s.-]+\d{3}[\s.-]+\d{4}(?!\d)")
@@ -75,11 +80,15 @@ def _normalize_url(value: str, parent: str, root: str) -> str | None:
     encoded_query = urllib.parse.quote(urllib.parse.unquote(parsed.query), safe="=&/?%:@!$'()*+,;=-._~")
     return urllib.parse.urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), encoded_path, "", encoded_query, ""))
 
-
-def _fetch(url: str, timeout: float) -> tuple[int, str, str]:
-    request = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
+def _fetch(url: str, timeout: float, user_agent: str = _USER_AGENT, proxy: str | None = None) -> tuple[int, str, str]:
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent}, method="GET")
+    handlers = []
+    if proxy:
+        handlers.append(urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
     context = ssl.create_default_context()
-    with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
+    opener = urllib.request.build_opener(*handlers) if proxy else None
+    opener_context = opener.open if opener is not None else urllib.request.urlopen
+    with opener_context(request, timeout=timeout, context=context) as response:
         payload = response.read(_MAX_BYTES + 1)
         return response.status, response.headers.get("content-type", ""), payload.decode(response.headers.get_content_charset() or "utf-8", errors="replace")
 
@@ -163,6 +172,10 @@ def _extract_links(text: str, page_url: str, root: str) -> dict[str, list[str]]:
 
 async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX_PAGES, max_depth: int = _MAX_DEPTH, concurrency: int = 8, progress_callback: Any = None) -> dict[str, Any]:
     host, root_url = normalize_target(target)
+    user_agents = list_value(_USER_AGENTS, (_USER_AGENT,))
+    proxies = list_value(_PROXIES)
+    user_agent_cycle = cycle(user_agents)
+    proxy_cycle = cycle(proxies) if proxies else None
     port_scan_task = asyncio.create_task(port_scan.analyze_async(host, timeout))
     root = _base_domain(host)
     start = root_url if urllib.parse.urlparse(root_url).scheme in {"http", "https"} else f"https://{host}/"
@@ -189,7 +202,11 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
     async def fetch_page(item: tuple[str, int, str]) -> tuple[tuple[str, int, str], tuple[int, str, str] | Exception]:
         url, _, _ = item
         try:
-            return item, await asyncio.to_thread(_fetch, url, timeout)
+            user_agent = next(user_agent_cycle)
+            proxy = next(proxy_cycle) if proxy_cycle is not None else None
+            fetch = partial(_fetch, url, timeout, user_agent, proxy)
+            status, content_type, text = await asyncio.to_thread(fetch)
+            return item, (status, content_type, text)
         except Exception as exc:
             return item, exc
 

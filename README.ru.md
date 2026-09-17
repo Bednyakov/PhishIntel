@@ -167,10 +167,19 @@ PHISHINTEL_TIMEOUT=8.0
 PHISHINTEL_RESOURCE_MAX_PAGES=500
 PHISHINTEL_RESOURCE_MAX_DEPTH=8
 PHISHINTEL_RESOURCE_CONCURRENCY=8
+PHISHINTEL_RESOURCE_USER_AGENTS=
+PHISHINTEL_RESOURCE_PROXIES=
 PHISHINTEL_HISTORY_FILE=data/history.jsonl
 ```
 
 Явные параметры CLI имеют приоритет над `.env`.
+
+`PHISHINTEL_RESOURCE_USER_AGENTS` задаёт разделённый запятыми пул User-Agent.
+Если значение пустое, используется встроенный User-Agent краулера. Для
+`PHISHINTEL_RESOURCE_PROXIES` указываются URL HTTP/HTTPS-прокси через запятую;
+при наличии нескольких прокси они распределяются по запросам циклически.
+Пустое значение полностью сохраняет прямое подключение, используемое по
+умолчанию.
 
 ## Тесты
 

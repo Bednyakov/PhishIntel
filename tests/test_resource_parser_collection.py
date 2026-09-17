@@ -1,11 +1,53 @@
 import unittest
 import time
 from unittest.mock import patch
+import os
 
 from app.analyzers import resource_parser
 
 
 class ResourceParserCollectionTests(unittest.TestCase):
+    @patch("app.analyzers.resource_parser.urllib.request.ProxyHandler")
+    @patch("app.analyzers.resource_parser.urllib.request.build_opener")
+    def test_fetch_applies_custom_user_agent_and_proxy(self, build_opener, proxy_handler):
+        opener = build_opener.return_value
+        response = opener.open.return_value.__enter__.return_value
+        response.status = 200
+        response.headers.get.return_value = "text/html"
+        response.headers.get_content_charset.return_value = None
+        response.read.return_value = b"<html></html>"
+
+        resource_parser._fetch("https://example.com/", 3, "Crawler/2.0", "http://proxy.example:8080")
+
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), "Crawler/2.0")
+        proxy_handler.assert_called_once_with({"http": "http://proxy.example:8080", "https": "http://proxy.example:8080"})
+        build_opener.assert_called_once_with(proxy_handler.return_value)
+
+    def test_empty_proxy_and_user_agent_configuration_keeps_defaults(self):
+        with patch.dict(os.environ, {"PHISHINTEL_RESOURCE_USER_AGENTS": "", "PHISHINTEL_RESOURCE_PROXIES": ""}, clear=False):
+            self.assertEqual(resource_parser.list_value("PHISHINTEL_RESOURCE_USER_AGENTS", (resource_parser._USER_AGENT,)), (resource_parser._USER_AGENT,))
+            self.assertEqual(resource_parser.list_value("PHISHINTEL_RESOURCE_PROXIES"), ())
+
+    @patch("app.analyzers.sitemap.analyze", return_value={"status": "ok", "urls": []})
+    @patch("app.analyzers.resource_parser.port_scan.analyze_async")
+    @patch("app.analyzers.resource_parser._fetch", return_value=(200, "text/html", "<html></html>"))
+    def test_configured_pools_are_assigned_round_robin(self, fetch, port_scan, _sitemap):
+        async def completed_scan(*_args):
+            return {"status": "ok"}
+
+        port_scan.return_value = completed_scan()
+        with patch.dict(os.environ, {
+            "PHISHINTEL_RESOURCE_USER_AGENTS": "UA-1,UA-2",
+            "PHISHINTEL_RESOURCE_PROXIES": "http://proxy-1:8080,http://proxy-2:8080",
+        }, clear=False):
+            resource_parser.analyze("https://example.com", max_pages=4, max_depth=1, concurrency=2)
+
+        assignments = [(call.args[2], call.args[3]) for call in fetch.call_args_list]
+        self.assertEqual(len(assignments), 4)
+        self.assertEqual(assignments.count(("UA-1", "http://proxy-1:8080")), 2)
+        self.assertEqual(assignments.count(("UA-2", "http://proxy-2:8080")), 2)
+
     def test_contact_extraction_uses_phone_masks_and_specialized_fields(self):
         result = resource_parser._extract('''
             <span class="phone">+7 (999) 123-45-67</span>

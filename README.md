@@ -168,10 +168,18 @@ PHISHINTEL_TIMEOUT=8.0
 PHISHINTEL_RESOURCE_MAX_PAGES=500
 PHISHINTEL_RESOURCE_MAX_DEPTH=8
 PHISHINTEL_RESOURCE_CONCURRENCY=8
+PHISHINTEL_RESOURCE_USER_AGENTS=
+PHISHINTEL_RESOURCE_PROXIES=
 PHISHINTEL_HISTORY_FILE=data/history.jsonl
 ```
 
 Explicit CLI options override `.env` values.
+
+`PHISHINTEL_RESOURCE_USER_AGENTS` is a comma-separated User-Agent pool. When
+empty, the built-in crawler User-Agent is used. `PHISHINTEL_RESOURCE_PROXIES`
+accepts comma-separated HTTP/HTTPS proxy URLs; configured proxies are assigned
+to requests in round-robin order. An empty value preserves the default direct
+connection.
 
 ## Tests
 
