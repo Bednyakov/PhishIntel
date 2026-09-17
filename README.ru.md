@@ -9,7 +9,7 @@
 ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝
                  PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL
 ```
-[English version](README.en.md)
+[English version](README.md)
 
 Инструмент для авторизованного сбора публичных данных с сайта и домена.
 Основной результат — компактный структурированный JSON-отчёт + HTML-отчет.
