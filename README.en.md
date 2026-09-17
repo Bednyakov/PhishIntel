@@ -17,15 +17,17 @@ compact structured JSON report.
 ## Quick start
 
 ```bash
+python3 main.py
+```
+
+or
+
+```bash
 python3 main.py resource-parser https://example.com \
   --max-pages 500 --max-depth 3 --concurrency 8 --stdout
 ```
 
 Without `--stdout`, the report is saved in `reports/`. Interactive mode:
-
-```bash
-python3 main.py
-```
 
 ## Main command: resource-parser
 
