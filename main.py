@@ -64,8 +64,7 @@ def _interactive_domain() -> dict:
 
 def _register_tools() -> None:
     if not all_tools():
-        register(Tool("domain-scan", "Анализ домена", "проверка домена и оценка фишингового риска.", _interactive_domain, _domain_cli))
-        register(Tool("resource-parser", "Парсинг ресурса", "рекурсивный сбор контактных данных со страниц ресурса и поддоменов.", interactive_resource_parser, run_resource_parser))
+        register(Tool("resource-parser", "Сбор данных ресурса", "рекурсивный сбор ссылок, доменов, API, скриптов и контактных данных.", interactive_resource_parser, run_resource_parser))
         register(Tool("username-search", "OSINT: поиск username", "поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
         register(Tool("email-check", "Проверка email", "полная проверка email: валидация, DNS/SMTP и поиск аккаунта по сайтам.", interactive_email_check, run_email_check))
 
@@ -98,11 +97,12 @@ def _parser() -> argparse.ArgumentParser:
     domain.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
     domain.add_argument("--active-tool", action="append", choices=("nmap", "nuclei", "zap"), default=list_value("PHISHINTEL_ACTIVE_TOOLS"))
     domain.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"))
-    resource = subparsers.add_parser("resource-parser", help="рекурсивный сбор контактных данных ресурса")
+    resource = subparsers.add_parser("resource-parser", help="полный рекурсивный сбор данных ресурса")
     resource.add_argument("target", help="домен или URL ресурса")
     resource.add_argument("--timeout", type=float, default=float_value("PHISHINTEL_TIMEOUT", 8.0))
     resource.add_argument("--max-pages", type=int, default=int_value("PHISHINTEL_RESOURCE_MAX_PAGES", 500))
-    resource.add_argument("--max-depth", type=int, default=int_value("PHISHINTEL_RESOURCE_MAX_DEPTH", 8))
+    resource.add_argument("--max-depth", type=int, default=int_value("PHISHINTEL_RESOURCE_MAX_DEPTH", 8), help="максимальная глубина рекурсивного поиска")
+    resource.add_argument("--concurrency", type=int, default=int_value("PHISHINTEL_RESOURCE_CONCURRENCY", 8), help="число одновременных запросов")
     resource.add_argument("--no-progress", action="store_true", default=bool_value("PHISHINTEL_NO_PROGRESS"))
     resource.add_argument("--stdout", action="store_true", default=bool_value("PHISHINTEL_STDOUT"))
     username = subparsers.add_parser("username-search", help="поиск публичных профилей по username")

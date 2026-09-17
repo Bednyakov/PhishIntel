@@ -1,3 +1,5 @@
+# PhishIntel
+
 ```
 ██████╗ ██╗  ██╗██╗███████╗██╗  ██╗██╗███╗   ██╗████████╗███████╗██╗
 ██╔══██╗██║  ██║██║██╔════╝██║  ██║██║████╗  ██║╚══██╔══╝██╔════╝██║
@@ -7,163 +9,154 @@
 ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝
                  PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL
 ```
-
 [Русская версия](README.md)
 
-An autonomous domain intelligence and phishing-risk analysis tool with a JSON report contract.
+An authorized website and domain data collection tool. Its primary output is a
+compact structured JSON report.
 
-## Usage
+## Quick start
+
+```bash
+python3 main.py resource-parser https://example.com \
+  --max-pages 500 --max-depth 3 --concurrency 8 --stdout
+```
+
+Without `--stdout`, the report is saved in `reports/`. Interactive mode:
 
 ```bash
 python3 main.py
-python3 main.py domain-scan example.com --profile quick
-python3 main.py domain-scan example.com --profile full --stdout
-python3 main.py domain-scan example.com --profile security --active-tool nmap
-python3 main.py resource-parser https://example.com --stdout
-python3 -m unittest discover -s tests -v
 ```
 
-Running `python3 main.py` opens the interactive tool menu. The domain tool supports three analysis profiles:
+## Main command: resource-parser
 
-- `quick` — basic network checks without JavaScript, search visibility, or active scanners;
-- `full` — complete analysis with JavaScript, dynamic browser analysis, and search visibility;
-- `security` — extended audit with JavaScript, dynamic analysis, and all active scanners in thorough mode.
-
-Network checks are optional: DNS, HTTP, and TLS errors are returned in the corresponding report sections as `status: unavailable`, so an unavailable service does not stop the complete report.
-
-While the scan is running, the CLI displays a progress bar in `stderr`, showing completed stages relative to the total number of stages. By default, the JSON report is saved to the `reports/` directory, and the console only displays a completion message and the saved file path. Use `--no-progress` to disable the progress bar.
-
-## Features
-
-```
-        ╭──────╮
-        │  🌐  │
-        │ .com │
-        ╰──────╯
-             ╲
-              ╲
+```text
+python3 main.py resource-parser TARGET [OPTIONS]
 ```
 
-- domain analysis;
-- extended DNS and IP/reverse DNS checks;
-- RDAP and WHOIS registration data;
-- HTTP, TLS, and redirect analysis;
-- content, form, and technology analysis;
-- sitemap analysis for `urlset` and `sitemapindex`;
-- local DNS/TLS history;
-- basic subdomain discovery;
-- explainable, context-aware phishing-risk scoring;
-- configurable reputation checks for domains, URLs, IP addresses, form actions, and external resources;
-- bounded static JavaScript analysis and optional isolated browser observation;
-- optional search-visibility OSINT, which is not a standalone risk verdict.
-- recursive resource parsing for publicly exposed contact data.
-- local email checks without third-party APIs: syntax, disposable domains, role accounts, DNS/MX, and local domain rules.
+`TARGET` is a domain name or URL.
 
-### Email checker
+| Option | Description | Default |
+|---|---|---:|
+| `--timeout` | network timeout | `8.0` seconds |
+| `--max-pages` | maximum processed URLs | `500` |
+| `--max-depth` | maximum crawl depth | `8` |
+| `--concurrency` | simultaneous requests | `8` |
+| `--no-progress` | disable terminal progress | off |
+| `--stdout` | print JSON instead of saving a file | off |
+
+Example:
+
+```bash
+python3 main.py resource-parser https://example.com \
+  --max-depth 2 --max-pages 200 --concurrency 6 \
+  --no-progress --stdout > report.json
+```
+
+The parser asynchronously crawls HTML pages on the target domain and its
+subdomains. URLs from `sitemap.xml` and nested sitemap files are used as crawl
+seeds, but sitemap data is not included in the final report.
+
+## Report contents
+
+- email addresses;
+- phone numbers matching Russian and US formats;
+- phone values from dedicated fields such as `tel`, `phone`, `telephone`, and
+  `mobile`;
+- addresses from dedicated fields and lines with explicit address hints;
+- source pages only where contacts were found;
+- external domains;
+- external API endpoints;
+- external JavaScript files;
+- aggregated crawl counters;
+- DNS, IP, and reverse DNS;
+- RDAP and WHOIS;
+- TLS certificate data;
+- redirect chains;
+- discovered subdomains;
+- local DNS/TLS history.
+
+
+Main JSON sections:
+
+```json
+{
+  "tool": "resource-parser",
+  "target": "https://example.com",
+  "root_domain": "example.com",
+  "summary": {},
+  "contacts": {},
+  "contact_sources": [],
+  "external_resources": {
+    "domains": [],
+    "api_urls": [],
+    "scripts": []
+  },
+  "domain": {
+    "dns": {},
+    "ip": {},
+    "rdap": {},
+    "whois": {},
+    "tls": {},
+    "redirects": {},
+    "subdomains": {},
+    "history": {}
+  }
+}
+```
+
+Individual service failures are represented inside their own section with
+`status: unavailable`; there is no global `errors` field.
+
+## Subdomains
+
+Discovery uses Certificate Transparency (`crt.sh`) and DNS checks against names
+from `wordlists/subdomains.txt`. Results are available in `domain.subdomains`
+with per-source results, a merged list, and a count.
+
+## Additional commands
 
 ```bash
 python3 main.py email-check user@example.com --stdout
-```
-
-The checker does not call breach, enrichment, or social-network APIs. It
-normalizes the address, checks syntax, consults the bundled MailAccess-derived
-disposable-domain corpus, classifies role accounts, resolves DNS information,
-and applies `wordlists/email_rules.json`. An MX record only means that the
-domain advertises mail exchangers; it does not prove that the mailbox exists.
-
-SMTP probing is opt-in with `--smtp`. It performs a limited `RCPT TO` probe
-against the domain MX server and may return `greylisted`, `uncertain`, or a
-catch-all result; it is not proof of mailbox existence.
-
-### Email account search
-
-```bash
+python3 main.py email-check user@example.com --smtp --stdout
 python3 main.py email-search user@example.com --stdout
+python3 main.py username-search username --stdout
 ```
 
-This checks account-existence indicators on sites described by the local
-`wordlists/email_search_rules.json` catalog. GET and POST requests, JSON
-payloads, headers, HTTP statuses, and response markers are supported. The
-catalog is based on MailAccess email-only rules; disabled or malformed rules
-are skipped. `found` means only that the response matched the configured rule,
-not that the address owner was confirmed.
+`email-check` validates syntax, disposable domains, role accounts, DNS/MX, and
+local rules. SMTP probing does not prove mailbox existence.
 
-### Resource parser
+Command-specific options:
 
 ```bash
-python3 main.py resource-parser https://example.com --stdout
+python3 main.py email-check --help
+python3 main.py email-search --help
+python3 main.py username-search --help
 ```
 
-The parser recursively visits HTML pages of the resource and discovered subdomains, collecting emails, phone numbers, cryptocurrency wallets, and strings that look like physical addresses. Each value is associated with its source page. The default limits are 500 pages and depth 8; use `--max-pages` and `--max-depth` to change them.
+`domain-scan` remains technically available as a legacy command for the old
+pipeline. It is not the primary workflow and may contain old risk/indicator
+sections. Use `resource-parser` for the current data collection workflow.
 
-For safety, crawling is limited to the original domain and its subdomains; external domains are not visited and binary files are skipped.
-
-Subdomain discovery uses two available sources: Certificate Transparency (`crt.sh`) and brute force against `wordlists/subdomains.txt`. The `passive_dns` field and a separate DNS source are part of the report contract, but require an external passive-DNS API.
-
-ASN, organization, country, and city in the IP result are returned as `null` when no external GeoIP/ASN provider is configured.
-
-Sitemaps are loaded from `https://<domain>/sitemap.xml`. The analyzer supports `urlset` and `sitemapindex`, with limits of 10 sitemap files, 2 MB per file, and 10,000 URLs. History is stored in the JSONL file `data/history.jsonl`. Change the path with the `PHISHINTEL_HISTORY_FILE` environment variable. The report's `history` field contains DNS/TLS snapshots and changes compared with the previous run. Invalid history lines are ignored.
-
-## Domain tool options
-
-- `domain-scan` — domain analysis tool;
-- `resource-parser` — recursive resource contact-data collection;
-- `target` — domain name or URL to analyze;
-- `--profile` — analysis profile: `quick`, `full`, or `security`;
-- `--timeout` — network-operation timeout in seconds, defaulting to `8.0`;
-- `--no-progress` — disable the progress bar;
-- `--stdout` — print JSON to stdout instead of saving it to a file;
-- `--active-tool` — limit active scanning to selected scanners (`nmap`, `nuclei`, or `zap`); repeat the option for multiple tools. In the `security` profile, omitting this option runs all supported scanners. Thorough Nmap uses a bounded discovery pass followed by service/version, NSE, and OS detection; its separate Nmap budget is at least 300 seconds so the audit is not cut short by the ordinary network timeout. Nuclei runs all available templates at low–critical severity without the quick-scan rate limit. Nmap exploit and brute-force script categories are intentionally excluded. Missing or unconfigured scanners are reported in `active_scan.tools` and do not stop the report.
-
-Lightweight checks additionally inspect security headers and cookie flags, mixed content, sensitive form fields, HTTP/HTTPS form actions, GET forms, dangerous download links, `robots.txt`, and `security.txt`. These are heuristics; a missing CSRF indicator is not proof of a vulnerability.
-
-All application settings are configured in `.env`. Copy `.env.example` to `.env` and fill in the required values. The file contains API keys, timeouts, resource-parser limits, domain profile, active scanners, username options, JSON/progress/color output settings, and the history path. Unconfigured providers are omitted from reports. Explicit CLI arguments take precedence over `.env`.
+## Configuration
 
 ```bash
 cp .env.example .env
-python3 main.py resource-parser https://example.com
 ```
 
-Static JavaScript analysis downloads a bounded number of external scripts, stores metadata and SHA-256 hashes, and checks heuristics such as `eval`, dynamic loading, cookie access, network submissions, and obfuscation. These signals are not proof of malware. Dynamic analysis is enabled only explicitly, does not submit forms, and disables downloads; use it only against systems you are authorized to test.
+```env
+PHISHINTEL_TIMEOUT=8.0
+PHISHINTEL_RESOURCE_MAX_PAGES=500
+PHISHINTEL_RESOURCE_MAX_DEPTH=8
+PHISHINTEL_RESOURCE_CONCURRENCY=8
+PHISHINTEL_HISTORY_FILE=data/history.jsonl
+```
 
-In the `security` profile, active scanners run automatically; use `--active-tool` to limit the set. In thorough mode, Nmap scans all TCP ports, detects services and the operating system, and runs default plus safe `vuln` NSE checks; Nuclei runs all available low–critical templates. ZAP requires a preconfigured daemon/API and reports configuration guidance when unavailable. Nmap exploit and brute-force script categories are intentionally excluded. Run active checks only against systems you are authorized to test.
+Explicit CLI options override `.env` values.
+
+## Tests
 
 ```bash
-python3 main.py domain-scan example.com --profile security --active-tool nmap
-python3 main.py domain-scan example.com --profile security --active-tool nuclei
-python3 main.py domain-scan example.com --profile security --active-tool nmap --active-tool nuclei
+python3 -m unittest discover -s tests -v
 ```
 
-Reports are pretty-printed and structured by default. For automation, print JSON to stdout, for example:
-
-```bash
-python3 main.py domain-scan example.com --stdout --no-progress > report.json
-```
-
-The files `wordlists/brands.txt` and `wordlists/phishing_keywords.txt` are used to detect brand mentions and phishing-related phrases in page content. The file `wordlists/subdomains.txt` is used to probe common subdomains through DNS. The lists can be extended one entry per line; blank lines and lines starting with `#` are ignored.
-
-The report filename is generated from the domain and the UTC start time, for example `reports/example.com_2026-08-22T14-30-15Z.json`.
-
-For automation, explicitly print JSON to stdout:
-
-```bash
-python3 main.py domain-scan example.com --stdout --no-progress > report.json
-```
-
-## Progress stages
-
-The progress bar tracks these stages:
-
-1. domain
-2. DNS
-3. IP/reverse DNS
-4. RDAP
-5. TLS
-6. HTTP
-7. redirects
-8. content
-9. WHOIS
-10. sitemap
-11. subdomains
-12. history
-13. scoring
+Only collect data from resources you are authorized to inspect.
