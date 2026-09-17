@@ -45,6 +45,46 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Summary", document)
         self.assertNotIn("Цепочка перенаправлений", document)
 
+    def test_render_includes_dns_tls_and_whois(self):
+        document = render({
+            "target": "example.com",
+            "dns": {"status": "ok", "a": ["192.0.2.1"], "mx": ["mail.example.com"]},
+            "tls": {"status": "ok", "version": "TLSv1.3", "cipher": "TLS_AES_256_GCM_SHA384", "not_after": "2030-01-01"},
+            "whois": {"status": "ok", "registrar": "Example Registrar", "created": "2020-01-01", "privacy": True},
+        })
+        self.assertIn("Записи DNS", document)
+        self.assertIn("192.0.2.1", document)
+        self.assertIn("Краткая информация о TLS", document)
+        self.assertIn("TLSv1.3", document)
+        self.assertIn("WHOIS", document)
+        self.assertIn("Example Registrar", document)
+        self.assertIn("да", document)
+
+    def test_render_supports_legacy_domain_sections(self):
+        document = render({"target": "example.com", "domain": {"dns": {"a": ["192.0.2.2"]}, "tls": {"version": "TLSv1.2"}, "whois": {"registrar": "Legacy Registrar"}}})
+        self.assertIn("192.0.2.2", document)
+        self.assertIn("TLSv1.2", document)
+        self.assertIn("Legacy Registrar", document)
+
+    def test_render_includes_ip_and_ipinfo_data(self):
+        document = render({
+            "target": "example.com",
+            "ip": {
+                "status": "ok",
+                "address": "192.0.2.10",
+                "addresses": ["192.0.2.10", "2001:db8::10"],
+                "version": 4,
+                "reverse_dns": "host.example.com",
+                "ipinfo": {"hostname": "host.example.com", "org": "AS64500 Example ISP", "country": "RU", "city": "Moscow"},
+            },
+        })
+        self.assertIn("Информация об IP-адресе", document)
+        self.assertIn("192.0.2.10", document)
+        self.assertIn("2001:db8::10", document)
+        self.assertIn("host.example.com", document)
+        self.assertIn("AS64500 Example ISP", document)
+        self.assertIn("Moscow", document)
+
 
 if __name__ == "__main__":
     unittest.main()

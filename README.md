@@ -9,44 +9,48 @@
 ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝
                  PHISHINTEL — OPEN-SOURCE INTELLIGENCE TOOL
 ```
-[English version](README.en.md)
+[Русская версия](README.md)
 
-Инструмент для авторизованного сбора публичных данных с сайта и домена.
-Основной результат — компактный структурированный JSON-отчёт.
+An authorized website and domain data collection tool. Its primary output is a
+compact structured JSON report + HTML report.
 
-## Быстрый старт
+## Quick start
 
+Interactive mode:
 ```bash
 python3 main.py
 ```
 
-или
+or
 
 ```bash
 python3 main.py resource-parser https://example.com \
   --max-pages 500 --max-depth 3 --concurrency 8 --stdout
 ```
 
-Без `--stdout` отчёт сохраняется в `reports/`. Интерактивный режим:
+Without `--stdout`, the report is saved in `reports/`.
 
-## Основная команда: resource-parser
+![Example HTML report](https://github.com/Bednyakov/PhishIntel/blob/main/data/rep_en1.jpg)
+Example HTML report
+
+## Main command: resource-parser
 
 ```text
 python3 main.py resource-parser TARGET [OPTIONS]
 ```
 
-`TARGET` — домен или URL ресурса.
+`TARGET` is a domain name or URL.
 
-| Параметр | Назначение | По умолчанию |
+| Option | Description | Default |
 |---|---|---:|
-| `--timeout` | таймаут сетевого запроса | `8.0` секунд |
-| `--max-pages` | максимум обработанных URL | `500` |
-| `--max-depth` | максимальная глубина обхода | `8` |
-| `--concurrency` | число одновременных запросов | `8` |
-| `--no-progress` | отключить прогресс в терминале | выключен |
-| `--stdout` | вывести JSON вместо файла | выключен |
+| `--timeout` | network timeout | `8.0` seconds |
+| `--max-pages` | maximum processed URLs | `500` |
+| `--max-depth` | maximum crawl depth | `8` |
+| `--concurrency` | simultaneous requests | `8` |
+| `--no-progress` | disable terminal progress | off |
+| `--stdout` | print JSON instead of saving a file | off |
 
-Пример:
+Example:
 
 ```bash
 python3 main.py resource-parser https://example.com \
@@ -54,39 +58,40 @@ python3 main.py resource-parser https://example.com \
   --no-progress --stdout > report.json
 ```
 
-Парсер асинхронно обходит HTML-страницы исходного домена и его поддоменов.
-URL из `sitemap.xml` и вложенных sitemap используются как источники страниц,
-но данные sitemap не включаются в итоговый отчёт.
+The parser asynchronously crawls HTML pages on the target domain and its
+subdomains. URLs from `sitemap.xml` and nested sitemap files are used as crawl
+seeds, but sitemap data is not included in the final report.
 
-## Что попадает в отчёт
+## Report contents
 
-- email-адреса;
-- телефоны по российским и американским форматам;
-- телефоны из HTML-полей `tel`, `phone`, `telephone`, `mobile` и аналогов;
-- адреса из специализированных полей и строк с явными адресными признаками;
-- источники только тех страниц, где найдены контакты;
-- внешние домены;
-- внешние API endpoint-ы;
-- внешние JavaScript-файлы;
-- агрегированные счётчики обхода;
-- DNS, IP и reverse DNS;
-- RDAP и WHOIS;
-- TLS-сертификат;
-- цепочка перенаправлений;
-- найденные поддомены;
-- локальная история DNS/TLS.
-- ограниченное сканирование TCP-портов исходного домена и определение технологий.
+- email addresses;
+- phone numbers matching Russian and US formats;
+- phone values from dedicated fields such as `tel`, `phone`, `telephone`, and
+  `mobile`;
+- addresses from dedicated fields and lines with explicit address hints;
+- source pages only where contacts were found;
+- external domains;
+- external API endpoints;
+- external JavaScript files;
+- aggregated crawl counters;
+- DNS, IP, and reverse DNS;
+- RDAP and WHOIS;
+- TLS certificate data;
+- redirect chains;
+- discovered subdomains;
+- local DNS/TLS history.
+- bounded TCP port scanning and technology detection for the original domain.
 
-### Анализ цепочки перенаправлений
+### Redirect chain analysis
 
-Раздел `domain.redirects` открывает исходный URL и записывает все HTTP-переходы
-до конечного адреса. Для каждого перехода сохраняются `from`, `to` и
-`status_code`; также в отчёт добавляются конечный URL (`final_url`) и общее
-количество переходов (`count`). Это помогает выявлять подозрительные внешние
-переходы и промежуточные домены.
+The `domain.redirects` section opens the source URL and records every HTTP
+transition until the final address. Each transition contains `from`, `to`, and
+`status_code`; the report also includes the final URL (`final_url`) and the total
+number of transitions (`count`). This helps identify suspicious external
+redirects and intermediate domains.
 
 
-Основные разделы JSON:
+Main JSON sections:
 
 ```json
 {
@@ -114,16 +119,16 @@ URL из `sitemap.xml` и вложенных sitemap используются к
 }
 ```
 
-Ошибки отдельных сервисов отражаются внутри соответствующего раздела через
-`status: unavailable`; отдельного поля `errors` нет.
+Individual service failures are represented inside their own section with
+`status: unavailable`; there is no global `errors` field.
 
-## Поддомены
+## Subdomains
 
-Используются Certificate Transparency (`crt.sh`) и DNS-проверка имён из
-`wordlists/subdomains.txt`. Результат доступен в `domain.subdomains` и содержит
-источники, объединённый список и количество найденных поддоменов.
+Discovery uses Certificate Transparency (`crt.sh`) and DNS checks against names
+from `wordlists/subdomains.txt`. Results are available in `domain.subdomains`
+with per-source results, a merged list, and a count.
 
-## Дополнительные команды
+## Additional commands
 
 ```bash
 python3 main.py email-check user@example.com --stdout
@@ -132,10 +137,10 @@ python3 main.py email-search user@example.com --stdout
 python3 main.py username-search username --stdout
 ```
 
-`email-check` проверяет синтаксис, disposable-домен, role-адрес, DNS/MX и
-локальные правила. SMTP-проверка не доказывает существование ящика.
+`email-check` validates syntax, disposable domains, role accounts, DNS/MX, and
+local rules. SMTP probing does not prove mailbox existence.
 
-Параметры:
+Command-specific options:
 
 ```bash
 python3 main.py email-check --help
@@ -143,16 +148,16 @@ python3 main.py email-search --help
 python3 main.py username-search --help
 ```
 
-`domain-scan` остаётся технически доступной legacy-командой старого pipeline.
-Она не является основным сценарием и может содержать старые risk/indicator-
-разделы. Для актуального сбора данных используйте `resource-parser`.
+`domain-scan` remains technically available as a legacy command for the old
+pipeline. It is not the primary workflow and may contain old risk/indicator
+sections. Use `resource-parser` for the current data collection workflow.
 
-При запуске `resource-parser` автоматически и параллельно с обходом страниц
-запускается встроенный Go-сканер ограниченного списка TCP-портов. Результат
-доступен в разделе `port_scan` JSON-отчёта и в HTML-отчёте. Сканируется только
-исходный домен; внешние домены, найденные на страницах, не передаются сканеру.
+`resource-parser` automatically starts the bundled Go scanner in parallel with
+the page crawler. It scans only the original domain using a bounded TCP port
+list; external domains discovered in pages are never scanned. Results are
+available in the JSON `port_scan` section and the HTML report.
 
-## Конфигурация
+## Configuration
 
 ```bash
 cp .env.example .env
@@ -166,12 +171,12 @@ PHISHINTEL_RESOURCE_CONCURRENCY=8
 PHISHINTEL_HISTORY_FILE=data/history.jsonl
 ```
 
-Явные параметры CLI имеют приоритет над `.env`.
+Explicit CLI options override `.env` values.
 
-## Тесты
+## Tests
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Запускайте сбор только для ресурсов, на проверку которых у вас есть разрешение.
+Only collect data from resources you are authorized to inspect.
