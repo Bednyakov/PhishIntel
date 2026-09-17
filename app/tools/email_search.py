@@ -4,10 +4,11 @@ from __future__ import annotations
 import argparse
 
 from ..analyzers import email_search
+from ..i18n import tr
 
 
 def _progress(update: dict) -> None:
-    print(f"Проверено: {update['completed']}/{update['total']}", end="\r", flush=True)
+    print(tr("progress_items", completed=update["completed"], total=update["total"]), end="\r", flush=True)
 
 
 def print_report(report: dict) -> None:
@@ -33,4 +34,4 @@ def run_cli(args: argparse.Namespace) -> dict:
 
 
 def interactive() -> dict:
-    return run(input("Email: ").strip())
+    return run(input(f"{tr('email')}: ").strip())

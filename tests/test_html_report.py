@@ -38,6 +38,13 @@ class HtmlReportTests(unittest.TestCase):
             self.assertEqual(path.suffix, ".html")
             self.assertTrue(Path(path).is_file())
 
+    def test_render_can_be_english(self):
+        document = render({"target": "example.com"}, locale="en")
+        self.assertIn('lang="en"', document)
+        self.assertIn("intelligence report", document)
+        self.assertIn("Summary", document)
+        self.assertNotIn("Цепочка перенаправлений", document)
+
 
 if __name__ == "__main__":
     unittest.main()

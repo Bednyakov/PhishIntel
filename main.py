@@ -17,6 +17,7 @@ from app.tools.username_search import interactive as interactive_username_search
 from app.tools.resource_parser import interactive as interactive_resource_parser, run_cli as run_resource_parser
 from app.tools.email import interactive as interactive_email_check, run_cli as run_email_check
 from app.report_html import save as save_html_report
+from app.i18n import LocaleContext, SUPPORTED_LOCALES, get_locale, set_locale, tr
 
 
 def _progress(update: dict) -> None:
@@ -46,28 +47,42 @@ def _ask(prompt: str, default: str | None = None) -> str:
     return value or (default or "")
 
 
+def _select_language() -> str:
+    # This screen is intentionally bilingual because the locale is not chosen yet.
+    print("\nSelect language / Выберите язык:")
+    print("1. English")
+    print("2. Русский")
+    while True:
+        selected = input("Your choice / Ваш выбор [2]: ").strip() or "2"
+        if selected in {"1", "2"}:
+            locale = SUPPORTED_LOCALES[int(selected) - 1]
+            set_locale(locale)
+            return locale
+        print("Error / Ошибка: choose 1 or 2 / выберите 1 или 2.", file=sys.stderr)
+
+
 def _interactive_domain() -> dict:
-    target = _ask("Домен или URL")
-    print("\nПрофиль анализа:")
-    profiles = (("quick", "Быстрая проверка"), ("full", "Полный анализ"), ("security", "Аудит безопасности"))
+    target = _ask(tr("domain_or_url"))
+    print(f"\n{tr('analysis_profile')}")
+    profiles = (("quick", tr("quick_profile")), ("full", tr("full_profile")), ("security", tr("security_profile")))
     for index, (_, title) in enumerate(profiles, 1):
         print(f"{index}. {title}")
-    selected = _ask("Выберите профиль", "2")
+    selected = _ask(tr("select_profile"), "2")
     try:
         profile = profiles[int(selected) - 1][0]
     except (ValueError, IndexError):
-        raise ValueError("некорректный номер профиля")
+        raise ValueError(tr("invalid_profile"))
     active_tools: tuple[str, ...] | None = None
-    if profile == "security" and _ask("Запустить активные сканеры? (может создавать сетевую нагрузку)", "y").lower() not in ("y", "yes", "д", "да"):
+    if profile == "security" and _ask(tr("active_scanners"), tr("yes")).lower() not in ("y", "yes", "д", "да"):
         profile = "full"
-    return run_domain_scan(DomainScanOptions(target, profile, float(_ask("Таймаут сетевых запросов", "8.0")), _progress, active_tools))
+    return run_domain_scan(DomainScanOptions(target, profile, float(_ask(tr("network_timeout"), "8.0")), _progress, active_tools))
 
 
 def _offer_html_report(report: dict) -> None:
-    if _ask("Сформировать краткий HTML-отчёт? (д/н)", "н").lower() not in ("д", "да", "y", "yes"):
+    if _ask(tr("html_offer"), tr("no")).lower() not in ("д", "да", "y", "yes"):
         return
-    path = save_html_report(report)
-    print(f"HTML-отчёт сохранён: {path}")
+    path = save_html_report(report, locale=get_locale())
+    print(tr("html_saved", path=path))
 
 
 def _register_tools() -> None:
@@ -75,6 +90,18 @@ def _register_tools() -> None:
         register(Tool("resource-parser", "Сбор данных ресурса", "рекурсивный сбор ссылок, доменов, API, скриптов и контактных данных.", interactive_resource_parser, run_resource_parser))
         register(Tool("username-search", "OSINT: поиск username", "поиск потенциальных публичных профилей по username.", interactive_username_search, run_username_search))
         register(Tool("email-check", "Проверка email", "полная проверка email: валидация, DNS/SMTP и поиск аккаунта по сайтам.", interactive_email_check, run_email_check))
+
+
+def _tool_text(tool: Tool, field: str) -> str:
+    key_by_tool = {
+        "resource-parser": "resource",
+        "username-search": "username",
+        "email-check": "email",
+    }
+    prefix = key_by_tool.get(tool.name)
+    if prefix is None:
+        return getattr(tool, field)
+    return tr(f"tool_{prefix}_{field}")
 
 
 def _save_report(report: dict, output_dir: str = "reports") -> Path:
@@ -163,30 +190,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.tool is None:
-            while True:
-                print("\nPhishIntel — выберите инструмент:\n")
-                for index, tool in enumerate(all_tools(), 1):
-                    print(f"{index}. {tool.title} — {tool.description}")
-                print("0. Выход")
-                choice = _ask("Ваш выбор", "0")
-                if choice == "0":
-                    return 0
-                try:
-                    tool = all_tools()[int(choice) - 1]
-                except (ValueError, IndexError):
-                    print("Ошибка: выберите номер инструмента из списка.", file=sys.stderr)
-                    continue
-
-                try:
-                    report = tool.run_interactive()
-                    path = _save_report(report)
-                    print(f"Инструмент {tool.title} завершён.")
-                    print(f"Отчёт сохранён: {path}")
-                    _offer_html_report(report)
-                except (ValueError, OSError) as exc:
-                    print(f"Ошибка при выполнении инструмента: {exc}", file=sys.stderr)
-                input("\nНажмите Enter, чтобы вернуться в главное меню...")
-                _print_banner()
+            locale = _select_language()
+            with LocaleContext(locale):
+                return _interactive_menu()
         tool = next((item for item in all_tools() if item.name == args.tool), None)
         if tool is None:
             parser.error(f"неизвестный инструмент: {args.tool}")
@@ -201,6 +207,33 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)
         return 2
+
+
+def _interactive_menu() -> int:
+    while True:
+        print(f"\n{tr('menu_title')}\n")
+        for index, tool in enumerate(all_tools(), 1):
+            print(f"{index}. {_tool_text(tool, 'title')} — {_tool_text(tool, 'description')}")
+        print(f"0. {tr('exit')}")
+        choice = _ask(tr("choice"), "0")
+        if choice == "0":
+            return 0
+        try:
+            tool = all_tools()[int(choice) - 1]
+        except (ValueError, IndexError):
+            print(tr("invalid_tool"), file=sys.stderr)
+            continue
+
+        try:
+            report = tool.run_interactive()
+            path = _save_report(report)
+            print(tr("tool_finished", title=_tool_text(tool, "title")))
+            print(tr("report_saved", path=path))
+            _offer_html_report(report)
+        except (ValueError, OSError) as exc:
+            print(tr("execution_error", error=exc), file=sys.stderr)
+        input(f"\n{tr('return_menu')}")
+        _print_banner()
 
 
 if __name__ == "__main__":

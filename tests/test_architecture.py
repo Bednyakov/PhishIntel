@@ -38,7 +38,7 @@ class ArchitectureTests(unittest.TestCase):
 
     @patch("main._register_tools")
     def test_main_without_arguments_can_exit_from_menu(self, _register):
-        with patch("main.all_tools", return_value=()), patch("builtins.input", return_value="0"), contextlib.redirect_stdout(io.StringIO()):
+        with patch("main.all_tools", return_value=()), patch("builtins.input", side_effect=["2", "0"]), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main.main([]), 0)
 
     @patch("main._register_tools")
@@ -57,11 +57,22 @@ class ArchitectureTests(unittest.TestCase):
     def test_interactive_menu_offers_html_after_json_report(self, offer_html, _register):
         report = {"target": "example.com", "risk": {"level": "low"}}
         tool = main.Tool("domain-scan", "Анализ домена", "", lambda: report, lambda _: report)
-        answers = iter(["1", "", "0"])
+        answers = iter(["2", "1", "", "0"])
         with patch("main.all_tools", return_value=(tool,)), patch("main._save_report", return_value=Path("reports/example.json")), patch("builtins.input", side_effect=lambda _prompt: next(answers)), patch("main._print_banner"), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main.main([]), 0)
 
         offer_html.assert_called_once_with(report)
+
+    @patch("main._register_tools")
+    def test_interactive_menu_can_be_started_in_english(self, _register):
+        tool = main.Tool("resource-parser", "Сбор данных ресурса", "русское описание", lambda: {}, lambda _: {})
+        with patch("main.all_tools", return_value=(tool,)), patch("builtins.input", side_effect=["1", "0"]), contextlib.redirect_stdout(io.StringIO()) as stdout:
+            self.assertEqual(main.main([]), 0)
+        self.assertIn("Select language", stdout.getvalue())
+        self.assertIn("PhishIntel — select a tool", stdout.getvalue())
+        self.assertIn("Resource data collection", stdout.getvalue())
+        self.assertIn("recursive collection", stdout.getvalue())
+        self.assertNotIn("Сбор данных ресурса", stdout.getvalue())
 
 
 if __name__ == "__main__":

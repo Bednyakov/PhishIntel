@@ -4,10 +4,11 @@ from __future__ import annotations
 import argparse
 
 from ..analyzers import resource_parser
+from ..i18n import tr
 
 
 def _progress(update: dict) -> None:
-    print(f"Проверено страниц: {update['completed']} | в очереди: {update['queued']}", end="\r", flush=True)
+    print(tr("progress_pages", completed=update["completed"], queued=update["queued"]), end="\r", flush=True)
 
 
 def print_report(report: dict) -> None:
@@ -60,8 +61,8 @@ def run_cli(args: argparse.Namespace) -> dict:
 
 
 def interactive() -> dict:
-    target = input("Домен или URL ресурса: ").strip()
-    max_pages = int(input("Максимальное число страниц [500]: ").strip() or "500")
-    max_depth = int(input("Глубина поиска [8]: ").strip() or "8")
-    concurrency = int(input("Параллельных запросов [8]: ").strip() or "8")
+    target = input(f"{tr('resource_url')}: ").strip()
+    max_pages = int(input(f"{tr('max_pages')} [500]: ").strip() or "500")
+    max_depth = int(input(f"{tr('max_depth')} [8]: ").strip() or "8")
+    concurrency = int(input(f"{tr('concurrency')} [8]: ").strip() or "8")
     return run(target, max_pages=max_pages, max_depth=max_depth, concurrency=concurrency)

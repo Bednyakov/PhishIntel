@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 
 from ..analyzers import email
+from ..i18n import tr
 
 
 def print_report(report: dict) -> None:
@@ -31,6 +32,6 @@ def run_cli(args: argparse.Namespace) -> dict:
 
 
 def interactive() -> dict:
-    address = input("Email: ").strip()
-    smtp = input("Проверить SMTP RCPT TO? (y/N): ").strip().lower() in {"y", "yes", "д", "да"}
+    address = input(f"{tr('email')}: ").strip()
+    smtp = input(f"{tr('smtp')}: ").strip().lower() in {"y", "yes", "д", "да"}
     return run(address, check_smtp=smtp)

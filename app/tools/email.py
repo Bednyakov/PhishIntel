@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..analyzers import email as email_analyzer
 from ..analyzers import email_search
+from ..i18n import tr
 
 RESET = "\033[0m"
 GREEN = "\033[32m"
@@ -27,7 +28,7 @@ def _marker(status: str) -> tuple[str, str]:
 
 
 def _progress(update: dict) -> None:
-    print(f"Проверено: {update['completed']}/{update['total']}", end="\r", flush=True)
+    print(tr("progress_items", completed=update["completed"], total=update["total"]), end="\r", flush=True)
 
 
 def print_report(report: dict, color: bool = True) -> None:
@@ -78,4 +79,4 @@ def run_cli(args: argparse.Namespace) -> dict:
 
 
 def interactive() -> dict:
-    return run(input("Email: ").strip(), smtp=True)
+    return run(input(f"{tr('email')}: ").strip(), smtp=True)
