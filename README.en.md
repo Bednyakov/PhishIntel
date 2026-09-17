@@ -77,6 +77,14 @@ seeds, but sitemap data is not included in the final report.
 - discovered subdomains;
 - local DNS/TLS history.
 
+### Redirect chain analysis
+
+The `domain.redirects` section opens the source URL and records every HTTP
+transition until the final address. Each transition contains `from`, `to`, and
+`status_code`; the report also includes the final URL (`final_url`) and the total
+number of transitions (`count`). This helps identify suspicious external
+redirects and intermediate domains.
+
 
 Main JSON sections:
 

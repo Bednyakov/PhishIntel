@@ -23,4 +23,4 @@ def analyze(target: str, timeout: float = 8.0) -> dict:
         with opener.open(urllib.request.Request(url, headers={"User-Agent": "phishintel/1.0"}), timeout=timeout) as response:
             return {"status": "ok", "chain": recorder.chain, "final_url": response.geturl(), "count": len(recorder.chain)}
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        return {**unavailable(exc), "chain": recorder.chain}
+        return {**unavailable(exc), "chain": recorder.chain, "final_url": None, "count": len(recorder.chain)}

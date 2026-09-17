@@ -30,6 +30,14 @@ def print_report(report: dict) -> None:
             if key in domain:
                 value = domain[key]
                 print(f"  - {key}: {value.get('status', 'ok') if isinstance(value, dict) else 'ok'}")
+        redirect_report = domain.get("redirects")
+        if isinstance(redirect_report, dict):
+            print("Redirect chain:")
+            print(f"  - transitions: {redirect_report.get('count', len(redirect_report.get('chain', [])))}")
+            for item in redirect_report.get("chain", []):
+                print(f"  - {item.get('status_code', '?')}: {item.get('from', '')} -> {item.get('to', '')}")
+            if redirect_report.get("final_url"):
+                print(f"  - final URL: {redirect_report['final_url']}")
 
 
 def run(target: str, timeout: float = 8.0, max_pages: int = 500, max_depth: int = 8, concurrency: int = 8, show_progress: bool = True, show_report: bool = True) -> dict:

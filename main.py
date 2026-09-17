@@ -16,6 +16,7 @@ from app.tools.domain_scan import DomainScanOptions, run as run_domain_scan
 from app.tools.username_search import interactive as interactive_username_search, run_cli as run_username_search
 from app.tools.resource_parser import interactive as interactive_resource_parser, run_cli as run_resource_parser
 from app.tools.email import interactive as interactive_email_check, run_cli as run_email_check
+from app.report_html import save as save_html_report
 
 
 def _progress(update: dict) -> None:
@@ -60,6 +61,13 @@ def _interactive_domain() -> dict:
     if profile == "security" and _ask("Запустить активные сканеры? (может создавать сетевую нагрузку)", "y").lower() not in ("y", "yes", "д", "да"):
         profile = "full"
     return run_domain_scan(DomainScanOptions(target, profile, float(_ask("Таймаут сетевых запросов", "8.0")), _progress, active_tools))
+
+
+def _offer_html_report(report: dict) -> None:
+    if _ask("Сформировать краткий HTML-отчёт? (д/н)", "н").lower() not in ("д", "да", "y", "yes"):
+        return
+    path = save_html_report(report)
+    print(f"HTML-отчёт сохранён: {path}")
 
 
 def _register_tools() -> None:
@@ -174,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
                     path = _save_report(report)
                     print(f"Инструмент {tool.title} завершён.")
                     print(f"Отчёт сохранён: {path}")
+                    _offer_html_report(report)
                 except (ValueError, OSError) as exc:
                     print(f"Ошибка при выполнении инструмента: {exc}", file=sys.stderr)
                 input("\nНажмите Enter, чтобы вернуться в главное меню...")

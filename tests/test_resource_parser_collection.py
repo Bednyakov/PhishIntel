@@ -23,6 +23,48 @@ class ResourceParserCollectionTests(unittest.TestCase):
         )
         self.assertIsNone(resource_parser._normalize_url("/bad\nurl", "https://example.com/", "example.com"))
 
+    @patch("app.analyzers.redirects.urllib.request.OpenerDirector.open")
+    def test_redirect_analyzer_returns_complete_chain_contract_on_error(self, open_request):
+        from urllib.error import URLError
+
+        from app.analyzers import redirects
+
+        open_request.side_effect = URLError("connection refused")
+        result = redirects.analyze("https://example.com")
+
+        self.assertEqual(result["chain"], [])
+        self.assertIsNone(result["final_url"])
+        self.assertEqual(result["count"], 0)
+
+    def test_resource_parser_report_prints_redirect_chain_details(self):
+        from app.tools.resource_parser import print_report
+        from contextlib import redirect_stdout
+        from io import StringIO
+
+        output = StringIO()
+        report = {
+            "target": "https://example.com",
+            "summary": {"pages_visited": 1},
+            "contacts": {},
+            "domain": {
+                "redirects": {
+                    "status": "ok",
+                    "chain": [{"from": "http://example.com", "to": "https://example.com", "status_code": 301}],
+                    "final_url": "https://example.com/",
+                    "count": 1,
+                }
+            },
+        }
+
+        with redirect_stdout(output):
+            print_report(report)
+
+        text = output.getvalue()
+        self.assertIn("Redirect chain:", text)
+        self.assertIn("301: http://example.com -> https://example.com", text)
+        self.assertIn("final URL: https://example.com/", text)
+        self.assertIn("transitions: 1", text)
+
     @patch("app.analyzers.resource_parser.subdomains.analyze", return_value={"status": "ok"})
     @patch("app.analyzers.resource_parser.redirects.analyze", return_value={"status": "ok"})
     @patch("app.analyzers.resource_parser.whois.analyze", return_value={"status": "ok"})

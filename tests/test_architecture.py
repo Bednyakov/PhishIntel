@@ -52,6 +52,17 @@ class ArchitectureTests(unittest.TestCase):
         self.assertNotIn(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), stdout.getvalue())
         self.assertIn("Отчёт сохранён:", stdout.getvalue())
 
+    @patch("main._register_tools")
+    @patch("main._offer_html_report")
+    def test_interactive_menu_offers_html_after_json_report(self, offer_html, _register):
+        report = {"target": "example.com", "risk": {"level": "low"}}
+        tool = main.Tool("domain-scan", "Анализ домена", "", lambda: report, lambda _: report)
+        answers = iter(["1", "", "0"])
+        with patch("main.all_tools", return_value=(tool,)), patch("main._save_report", return_value=Path("reports/example.json")), patch("builtins.input", side_effect=lambda _prompt: next(answers)), patch("main._print_banner"), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main.main([]), 0)
+
+        offer_html.assert_called_once_with(report)
+
 
 if __name__ == "__main__":
     unittest.main()
