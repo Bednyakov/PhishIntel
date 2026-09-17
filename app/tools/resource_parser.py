@@ -23,6 +23,14 @@ def print_report(report: dict) -> None:
         print(f"{key.replace('_', ' ').title()}: {len(values)}")
         for value in values:
             print(f"  - {value}")
+    port_scan = report.get("port_scan", {})
+    print("Port scan:")
+    print(f"  - status: {port_scan.get('status', 'unavailable')}")
+    print(f"  - open ports: {port_scan.get('open_port_count', len(port_scan.get('ports', [])))}")
+    for item in port_scan.get("ports", []):
+        technology = f"; technology: {item.get('technology')}" if item.get("technology") else ""
+        version = f" {item.get('version')}" if item.get("version") else ""
+        print(f"  - {item.get('port')}/{item.get('protocol', 'tcp')}: {item.get('service', 'unknown')}{version}{technology}")
     domain = report.get("domain", {})
     if domain:
         print("Domain infrastructure:")

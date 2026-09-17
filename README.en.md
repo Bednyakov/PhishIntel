@@ -76,6 +76,7 @@ seeds, but sitemap data is not included in the final report.
 - redirect chains;
 - discovered subdomains;
 - local DNS/TLS history.
+- bounded TCP port scanning and technology detection for the original domain.
 
 ### Redirect chain analysis
 
@@ -146,6 +147,11 @@ python3 main.py username-search --help
 `domain-scan` remains technically available as a legacy command for the old
 pipeline. It is not the primary workflow and may contain old risk/indicator
 sections. Use `resource-parser` for the current data collection workflow.
+
+`resource-parser` automatically starts the bundled Go scanner in parallel with
+the page crawler. It scans only the original domain using a bounded TCP port
+list; external domains discovered in pages are never scanned. Results are
+available in the JSON `port_scan` section and the HTML report.
 
 ## Configuration
 

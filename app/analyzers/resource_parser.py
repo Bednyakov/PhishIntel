@@ -15,7 +15,7 @@ from urllib.parse import parse_qsl
 
 from .common import normalize_target
 from ..history import record as record_history
-from . import dns, rdap, redirects, subdomains, tls, whois
+from . import dns, port_scan, rdap, redirects, subdomains, tls, whois
 
 _MAX_PAGES = 500
 _MAX_DEPTH = 8
@@ -163,6 +163,7 @@ def _extract_links(text: str, page_url: str, root: str) -> dict[str, list[str]]:
 
 async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX_PAGES, max_depth: int = _MAX_DEPTH, concurrency: int = 8, progress_callback: Any = None) -> dict[str, Any]:
     host, root_url = normalize_target(target)
+    port_scan_task = asyncio.create_task(port_scan.analyze_async(host, timeout))
     root = _base_domain(host)
     start = root_url if urllib.parse.urlparse(root_url).scheme in {"http", "https"} else f"https://{host}/"
     queue: list[tuple[str, int, str]] = [(start, 0, "seed")]
@@ -287,6 +288,10 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
             "scripts": external_script_urls,
         },
     }
+    try:
+        report["port_scan"] = await port_scan_task
+    except Exception as exc:
+        report["port_scan"] = port_scan.unavailable(host, "completed_with_errors", str(exc))
     try:
         dns_result = dns.analyze(host)
         report["domain"] = {

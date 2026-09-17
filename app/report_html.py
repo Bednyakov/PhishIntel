@@ -39,6 +39,7 @@ def render(report: dict[str, Any]) -> str:
     summary = report.get("summary", {})
     contacts = report.get("contacts", {})
     external = report.get("external_resources", {})
+    port_scan = report.get("port_scan", {})
     redirects = report.get("redirects") or report.get("domain", {}).get("redirects", {})
     chain = redirects.get("chain", []) if isinstance(redirects, dict) else []
     contact_summary = "".join(
@@ -61,6 +62,18 @@ def render(report: dict[str, Any]) -> str:
         for item in chain
     ) or "<li>Переходов нет</li>"
     final_url = redirects.get("final_url") if isinstance(redirects, dict) else None
+    port_items = "".join(
+        "<li><code>{}/{}".format(
+            html.escape(_text(item.get("port"))),
+            html.escape(_text(item.get("protocol", "tcp"))),
+        )
+        + "</code> "
+        + html.escape(_text(item.get("service") or "unknown"))
+        + (" " + html.escape(_text(item.get("version"))) if item.get("version") else "")
+        + (" — " + html.escape(_text(item.get("technology"))) if item.get("technology") else "")
+        + "</li>"
+        for item in port_scan.get("ports", [])
+    ) or "<li>Открытые порты не обнаружены</li>"
 
     return f"""<!doctype html>
 <html lang="ru">
@@ -87,6 +100,7 @@ ul {{ margin:0; padding-left:22px; }} li {{ margin:7px 0; overflow-wrap:anywhere
 <section><h2>Внешние ресурсы</h2><ul>{external_items}</ul></section>
 </div>
 <section><h2>Цепочка перенаправлений</h2>{_row('Переходов', redirects.get('count', len(chain)) if isinstance(redirects, dict) else 0)}{_row('Конечный URL', final_url)}<ul>{redirect_items}</ul></section>
+<section><h2>Открытые порты и технологии</h2>{_row('Статус', port_scan.get('status', 'unavailable'))}{_row('Открытых портов', port_scan.get('open_port_count', len(port_scan.get('ports', []))))}<ul>{port_items}</ul></section>
 <section><h2>Контактная информация</h2><ul>{contact_details}</ul></section>
 <footer>Сформировано PhishIntel • {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</footer>
 </main></body></html>
