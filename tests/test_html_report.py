@@ -85,6 +85,16 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("AS64500 Example ISP", document)
         self.assertIn("Moscow", document)
 
+    def test_render_includes_website_technologies(self):
+        document = render({"target": "example.com", "technologies": ["WordPress", "PHP"]})
+        self.assertIn("Технологии сайта", document)
+        self.assertIn("WordPress", document)
+        self.assertIn("PHP", document)
+
+    def test_render_reads_technologies_from_content_compatibility_section(self):
+        document = render({"target": "example.com", "content": {"technologies": ["React"]}})
+        self.assertIn("React", document)
+
 
 if __name__ == "__main__":
     unittest.main()

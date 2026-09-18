@@ -8,6 +8,14 @@ from app.report_html import render
 
 
 class PortScanTests(unittest.TestCase):
+    def test_ipv6_target_is_passed_to_scanner_without_url_brackets(self):
+        async def completed(*command, **_kwargs):
+            self.assertIn("2a03:6f02::76bb", command)
+            return type("Process", (), {"returncode": 0, "communicate": AsyncMock(return_value=(b'{"status":"ok","target":"2a03:6f02::76bb","ports":[],"open_port_count":0,"technologies":[]}', b""))})()
+
+        with patch("app.analyzers.port_scan._binary", return_value="/scanner"), patch("app.analyzers.port_scan.os.path.isabs", return_value=True), patch("app.analyzers.port_scan.asyncio.create_subprocess_exec", new=completed):
+            result = asyncio.run(port_scan.analyze_async("2a03:6f02::76bb", timeout=1))
+        self.assertEqual(result["status"], "ok")
     def test_unavailable_result_has_stable_contract(self):
         result = port_scan.unavailable("example.com")
         self.assertEqual(result["status"], "unavailable")

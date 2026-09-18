@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"regexp"
 	"sort"
@@ -58,7 +59,7 @@ func main() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	addresses, err := net.DefaultResolver.LookupHost(ctx, *target)
+	addresses, err := resolveTarget(ctx, *target)
 	if err != nil {
 		result.Status, result.Error = "unavailable", err.Error()
 		writeResult(result, started)
@@ -79,6 +80,13 @@ func main() {
 	}
 	sort.Strings(result.Technologies)
 	writeResult(result, started)
+}
+
+func resolveTarget(ctx context.Context, target string) ([]string, error) {
+	if address, err := netip.ParseAddr(target); err == nil {
+		return []string{address.String()}, nil
+	}
+	return net.DefaultResolver.LookupHost(ctx, target)
 }
 
 func scan(ctx context.Context, host, address string, timeout time.Duration) []Port {
@@ -132,7 +140,7 @@ func probe(ctx context.Context, host, address string, port int, timeout time.Dur
 	result := Port{Port: port, Protocol: "tcp", State: "open", Service: service}
 	_ = conn.SetDeadline(time.Now().Add(timeout))
 	if port == 80 || port == 8080 || port == 8000 || port == 8443 || port == 443 {
-		result.Banner, result.Technology, result.Version = httpProbe(host, port)
+		result.Banner, result.Technology, result.Version = httpProbe(address, port)
 	} else {
 		buffer := make([]byte, 512)
 		n, _ := conn.Read(buffer)
@@ -149,7 +157,7 @@ func httpProbe(host string, port int) (string, string, string) {
 	}
 	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, DialContext: (&net.Dialer{Timeout: 2 * time.Second}).DialContext}
 	client := &http.Client{Transport: transport, Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	response, err := client.Get(fmt.Sprintf("%s://%s:%d/", scheme, host, port))
+	response, err := client.Get(fmt.Sprintf("%s://%s/", scheme, net.JoinHostPort(host, fmt.Sprint(port))))
 	if err != nil {
 		return "", "", ""
 	}

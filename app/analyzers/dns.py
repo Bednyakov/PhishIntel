@@ -3,6 +3,7 @@
 import shutil
 import socket
 import subprocess
+import ipaddress
 
 from .common import normalize_target, unavailable
 
@@ -26,6 +27,12 @@ def _lookup(host: str, record: str) -> list[str]:
 def analyze(target: str) -> dict:
     host, _ = normalize_target(target)
     result = {"status": "ok", "a": [], "aaaa": [], "cname": _lookup(host, "CNAME"), "mx": _lookup(host, "MX"), "ns": _lookup(host, "NS"), "txt": _lookup(host, "TXT"), "caa": _lookup(host, "CAA"), "soa": {}}
+    try:
+        address = ipaddress.ip_address(host)
+        result["a" if address.version == 4 else "aaaa"] = [host]
+        return result
+    except ValueError:
+        pass
     try:
         info = socket.getaddrinfo(host, None)
         result["a"] = sorted({item[4][0] for item in info if ":" not in item[4][0]})

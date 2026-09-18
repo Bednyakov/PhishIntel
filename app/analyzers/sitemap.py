@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-from .common import normalize_target, unavailable
+from .common import host_url, normalize_target, unavailable
 
 _MAX_BYTES = 2_000_000
 _MAX_URLS = 10_000
@@ -48,7 +48,7 @@ def _fetch_sitemaps(urls: list[str], timeout: float) -> list[tuple[str, tuple[in
 
 def analyze(target: str, timeout: float = 8.0) -> dict:
     host, _ = normalize_target(target)
-    root_url = f"https://{host}/sitemap.xml"
+    root_url = host_url(host, "sitemap.xml")
     queue = [root_url]
     visited = set()
     urls = set()

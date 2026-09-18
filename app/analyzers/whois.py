@@ -4,6 +4,9 @@ import re
 import shutil
 import socket
 import subprocess
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 
 from .common import normalize_target
@@ -21,6 +24,7 @@ WHOIS_SERVERS = {
 DATE_KEYS = ("creation date", "created", "registered on", "registration time")
 UPDATED_KEYS = ("updated date", "last updated", "changed", "last modified")
 EXPIRES_KEYS = ("registry expiry date", "expiration date", "expiry date", "expires")
+IP_WHOIS_URL = "https://rdap.org/ip/{}"
 
 
 def _server_for(host: str) -> str:
@@ -61,8 +65,62 @@ def _date(value: str | None) -> str | None:
         return value
 
 
+def _ip_whois(host: str, timeout: float) -> dict:
+    """Look up IP allocation data through the RDAP IP endpoint.
+
+    RDAP is the standards-based successor to IP WHOIS and returns the
+    registry/registrant network information for both IPv4 and IPv6.
+    """
+    request = urllib.request.Request(
+        IP_WHOIS_URL.format(urllib.parse.quote(host, safe="")),
+        headers={"Accept": "application/rdap+json, application/json", "User-Agent": "phishintel/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = __import__("json").loads(response.read(2_000_000))
+            entities = data.get("entities", [])
+            names = []
+            emails = []
+            for entity in entities:
+                vcard = entity.get("vcardArray", [None, []])[1]
+                for item in vcard:
+                    if len(item) < 4:
+                        continue
+                    if item[0] == "fn" and item[3]:
+                        names.append(str(item[3]))
+                    if item[0] == "email" and item[3]:
+                        emails.append(str(item[3]))
+            return {
+                "status": "ok",
+                "type": "ip",
+                "address": host,
+                "handle": data.get("handle"),
+                "name": data.get("name"),
+                "start_address": data.get("startAddress"),
+                "end_address": data.get("endAddress"),
+                "ip_version": data.get("ipVersion"),
+                "country": data.get("country"),
+                "parent_handle": data.get("parentHandle"),
+                "status_codes": data.get("status", []),
+                "organization": next(iter(dict.fromkeys(names)), None),
+                "contacts": sorted(set(emails)),
+                "remarks": [remark.get("title") for remark in data.get("remarks", []) if remark.get("title")],
+                "source": "rdap.org",
+            }
+    except urllib.error.HTTPError as exc:
+        return {"status": "not_found" if exc.code == 404 else "unavailable", "type": "ip", "address": host, "source": "rdap.org", "http_status": exc.code}
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, TypeError) as exc:
+        return {"status": "unavailable", "type": "ip", "address": host, "source": "rdap.org", "error": str(exc)}
+
+
 def analyze(target: str, timeout: float = 8.0) -> dict:
     host, _ = normalize_target(target)
+    try:
+        import ipaddress
+        if ipaddress.ip_address(host):
+            return _ip_whois(host, timeout)
+    except ValueError:
+        pass
     server = _server_for(host)
     try:
         raw, source = _query(host, server, timeout)

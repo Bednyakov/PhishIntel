@@ -1,6 +1,7 @@
 """RDAP registration analyzer with IANA bootstrap discovery."""
 
 import json
+import ipaddress
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -56,6 +57,11 @@ def _registration(data: dict) -> dict:
 
 def analyze(target: str, timeout: float = 8.0) -> dict:
     host, _ = normalize_target(target)
+    try:
+        if ipaddress.ip_address(host):
+            return {"status": "not_applicable", "type": "ip", "address": host, "reason": "IP registration is reported by IP WHOIS/RDAP"}
+    except ValueError:
+        pass
     tld = host.rsplit(".", 1)[-1].lower()
     try:
         servers = _bootstrap_servers(tld, timeout)

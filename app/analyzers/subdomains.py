@@ -1,6 +1,7 @@
 """Basic subdomain discovery using CT logs and DNS wordlist probing."""
 
 import json
+import ipaddress
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import urllib.error
@@ -36,6 +37,11 @@ def _brute_force(candidates: list[str]) -> set[str]:
 
 def analyze(target: str, timeout: float = 3.0, wordlist: str | None = None) -> dict:
     host, _ = normalize_target(target)
+    try:
+        if ipaddress.ip_address(host):
+            return {"status": "not_applicable", "address": host, "subdomains": [], "count": 0, "sources": {}}
+    except ValueError:
+        pass
     found = {"certificate_transparency": set(_ct(host, timeout)), "dns": set(), "passive_dns": set(), "brute_force": set()}
     wordlist_path = Path(wordlist) if wordlist else Path(__file__).resolve().parents[2] / "wordlists" / "subdomains.txt"
     try:

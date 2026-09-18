@@ -4,6 +4,8 @@ import ssl
 import urllib.error
 import urllib.request
 
+from .common import host_url
+
 
 def _fetch(url: str, timeout: float) -> dict:
     try:
@@ -17,5 +19,5 @@ def _fetch(url: str, timeout: float) -> dict:
 def analyze(host: str, timeout: float = 8.0) -> dict:
     result = {}
     for name in ("robots.txt", ".well-known/security.txt"):
-        result[name] = _fetch(f"https://{host}/{name}", timeout)
+        result[name] = _fetch(host_url(host, name), timeout)
     return result

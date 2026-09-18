@@ -1,10 +1,41 @@
 import unittest
+import json
 from unittest.mock import patch
 
 from app.analyzers import dns, rdap, subdomains, whois
 
 
 class AnalyzerTests(unittest.TestCase):
+    def test_normalize_supports_ipv4_and_ipv6_targets(self):
+        from app.analyzers.common import normalize_target
+
+        self.assertEqual(normalize_target("192.0.2.10"), ("192.0.2.10", "https://192.0.2.10/"))
+        self.assertEqual(normalize_target("2001:db8::10"), ("2001:db8::10", "https://[2001:db8::10]/"))
+        self.assertEqual(normalize_target("https://[2001:db8::10]/health"), ("2001:db8::10", "https://[2001:db8::10]/health"))
+        self.assertEqual(normalize_target("2a03:6f02::76bb"), ("2a03:6f02::76bb", "https://[2a03:6f02::76bb]/"))
+
+    def test_dns_analyze_accepts_ipv6_literal(self):
+        result = dns.analyze("2001:db8::10")
+        self.assertEqual(result["aaaa"], ["2001:db8::10"])
+        self.assertEqual(result["a"], [])
+
+    def test_active_target_accepts_requested_ipv6_literal(self):
+        from app.analyzers.active import _safe_target
+
+        self.assertEqual(_safe_target("2a03:6f02::76bb"), ("2a03:6f02::76bb", "https://[2a03:6f02::76bb]"))
+
+    @patch("app.analyzers.whois.urllib.request.urlopen")
+    def test_ip_whois_uses_rdap_for_ipv6(self, urlopen):
+        payload = {"handle": "NET-2001-DB8-1", "name": "TEST-NET", "startAddress": "2001:db8::", "endAddress": "2001:db8::ffff", "ipVersion": "v6", "country": "ZZ", "entities": [{"vcardArray": ["vcard", [["fn", {}, "text", "Example Registry"]]]}]}
+        response = type("Response", (), {"__enter__": lambda self: self, "__exit__": lambda self, *args: None, "read": lambda self, _: json.dumps(payload).encode(), "status": 200})()
+        urlopen.return_value = response
+
+        result = whois.analyze("2001:db8::10")
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["type"], "ip")
+        self.assertEqual(result["organization"], "Example Registry")
+        self.assertIn("2001%3Adb8%3A%3A10", urlopen.call_args.args[0].full_url)
     @patch("app.analyzers.subdomains.dns_analyze")
     def test_subdomain_bruteforce_probes_candidates_in_parallel_batch(self, dns_lookup):
         dns_lookup.side_effect = lambda candidate: {"status": "ok"} if candidate.startswith("www.") else {"status": "unavailable"}

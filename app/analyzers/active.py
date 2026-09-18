@@ -1,6 +1,7 @@
 """Wrappers for installed active security scanners."""
 
 import json
+import ipaddress
 import shutil
 import subprocess
 import re
@@ -75,10 +76,23 @@ def _parse_nmap(output: str) -> dict:
 
 
 def _safe_target(target: str) -> tuple[str, str]:
-    parsed = urlparse(target if "://" in target else f"https://{target}")
-    if not parsed.hostname or parsed.hostname != parsed.hostname.lower() or any(char in parsed.hostname for char in ("/", "\\", "@")):
+    candidate = target
+    if "://" not in candidate:
+        try:
+            ipaddress.IPv6Address(candidate)
+            candidate = f"https://[{candidate}]"
+        except ValueError:
+            candidate = f"https://{candidate}"
+    parsed = urlparse(candidate)
+    if not parsed.hostname or any(char in parsed.hostname for char in ("/", "\\", "@")):
         raise ValueError("active scan target must be a hostname or URL")
-    return parsed.hostname, parsed.geturl()
+    host = parsed.hostname.lower()
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        if host != parsed.hostname or "." not in host:
+            raise ValueError("active scan target must be a hostname or URL")
+    return host, parsed.geturl()
 
 
 def _run_nmap_thorough(executable: str, host: str, timeout: float) -> dict:

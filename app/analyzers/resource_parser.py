@@ -16,7 +16,7 @@ from typing import Any
 from urllib.parse import parse_qsl
 
 from ..config import list_value
-from .common import normalize_target
+from .common import host_url, normalize_target
 from ..history import record as record_history
 from . import dns, port_scan, rdap, redirects, subdomains, tls, whois
 
@@ -42,6 +42,11 @@ _ATTR = re.compile(r"(?is)\b(?:href|src|action|data-url|data-api|content)\s*=\s*
 
 
 def _base_domain(host: str) -> str:
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
     parts = host.split(".")
     return ".".join(parts[-2:]) if len(parts) >= 2 else host
 
@@ -49,6 +54,10 @@ def _base_domain(host: str) -> str:
 def _allowed_host(host: str, root: str) -> bool:
     host = host.rstrip(".").lower()
     root = root.rstrip(".").lower()
+    try:
+        return ipaddress.ip_address(host) == ipaddress.ip_address(root)
+    except ValueError:
+        pass
     return host == root or host.endswith("." + root)
 
 
@@ -178,7 +187,7 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
     proxy_cycle = cycle(proxies) if proxies else None
     port_scan_task = asyncio.create_task(port_scan.analyze_async(host, timeout))
     root = _base_domain(host)
-    start = root_url if urllib.parse.urlparse(root_url).scheme in {"http", "https"} else f"https://{host}/"
+    start = root_url if urllib.parse.urlparse(root_url).scheme in {"http", "https"} else host_url(host)
     queue: list[tuple[str, int, str]] = [(start, 0, "seed")]
     visited: set[str] = set()
     pages: list[dict[str, Any]] = []
