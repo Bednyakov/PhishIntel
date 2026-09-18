@@ -95,6 +95,11 @@ class HtmlReportTests(unittest.TestCase):
         document = render({"target": "example.com", "content": {"technologies": ["React"]}})
         self.assertIn("React", document)
 
+    def test_render_includes_resource_parser_technologies(self):
+        document = render({"target": "example.com", "technologies": ["WordPress", "PHP"]})
+        self.assertIn("WordPress", document)
+        self.assertIn("PHP", document)
+
 
 if __name__ == "__main__":
     unittest.main()

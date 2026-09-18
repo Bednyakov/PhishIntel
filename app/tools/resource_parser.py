@@ -24,6 +24,9 @@ def print_report(report: dict) -> None:
         print(f"{key.replace('_', ' ').title()}: {len(values)}")
         for value in values:
             print(f"  - {value}")
+    print("Technologies:")
+    for technology in report.get("technologies", []):
+        print(f"  - {technology}")
     port_scan = report.get("port_scan", {})
     print("Port scan:")
     print(f"  - status: {port_scan.get('status', 'unavailable')}")

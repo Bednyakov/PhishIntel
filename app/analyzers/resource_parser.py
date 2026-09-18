@@ -18,7 +18,7 @@ from urllib.parse import parse_qsl
 from ..config import list_value
 from .common import host_url, normalize_target
 from ..history import record as record_history
-from . import dns, port_scan, rdap, redirects, subdomains, tls, whois
+from . import content, dns, port_scan, rdap, redirects, subdomains, tls, whois
 
 _MAX_PAGES = 500
 _MAX_DEPTH = 8
@@ -192,6 +192,7 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
     visited: set[str] = set()
     pages: list[dict[str, Any]] = []
     found = {"emails": [], "phones": [], "wallets": [], "addresses": []}
+    technologies: set[str] = set()
     discovered = {"links": [], "domains": [], "scripts": [], "api_urls": []}
     errors: list[dict[str, str]] = []
     sitemap_urls: list[str] = []
@@ -244,6 +245,14 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
                 continue
             extracted = _extract(body)
             page["contacts"] = extracted
+            content_result = content.analyze({
+                "status": "ok",
+                "url": url,
+                "headers": {"content-type": content_type},
+                "_body": body,
+            })
+            page["technologies"] = content_result.get("technologies", [])
+            technologies.update(page["technologies"])
             pages.append(page)
             for key in found:
                 found[key].extend(extracted[key])
@@ -307,6 +316,7 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
         "root_domain": root,
         "summary": summary,
         "contacts": {key: _unique(values) for key, values in found.items()},
+        "technologies": sorted(technologies),
         "contact_sources": contact_sources,
         "external_resources": {
             "domains": external_domains,

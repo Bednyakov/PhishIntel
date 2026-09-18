@@ -145,6 +145,24 @@ class ResourceParserCollectionTests(unittest.TestCase):
         self.assertIn("support@example.com", report["contacts"]["emails"])
         self.assertIn("subdomains", report["domain"])
 
+    @patch("app.analyzers.resource_parser.subdomains.analyze", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.redirects.analyze", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.whois.analyze", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.tls.analyze", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.rdap.analyze", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.dns.analyze_ip", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.dns.analyze", return_value={"status": "ok"})
+    @patch("app.analyzers.resource_parser.record_history", return_value={"status": "ok"})
+    @patch("app.analyzers.sitemap.analyze", return_value={"status": "ok", "urls": []})
+    @patch("app.analyzers.resource_parser._fetch")
+    def test_report_contains_page_technologies(self, fetch, *_mocks):
+        fetch.return_value = (200, "text/html", '<meta name="generator" content="WordPress 6.6"><script src="/wp-includes/js/jquery.js"></script>')
+
+        report = resource_parser.analyze("https://example.com", max_pages=1)
+
+        self.assertIn("WordPress", report["technologies"])
+        self.assertIn("jQuery", report["technologies"])
+
     def test_async_analyzer_fetches_multiple_pages_concurrently(self):
         active = 0
         peak = 0

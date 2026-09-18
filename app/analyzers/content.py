@@ -14,6 +14,52 @@ _PHONE_RE = re.compile(r"(?<!\w)(\+?\d[\d\s().-]{6,}\d)(?!\w)")
 _CONTACT_ATTRIBUTES = ("href", "content", "value", "data-contact", "aria-label", "title")
 
 
+def _detect_technologies(body: str, http_result: dict, parser: "_PageParser") -> list[str]:
+    """Detect technologies from several independent, low-cost HTTP signals."""
+    lower = body.lower()
+    headers = {str(key).lower(): str(value).lower() for key, value in (http_result.get("headers") or {}).items()}
+    header_text = " ".join(f"{key}: {value}" for key, value in headers.items())
+    resource_urls = " ".join(str(item.get("url") or "").lower() for item in parser.resources)
+    script_urls = " ".join(str(url).lower() for url in parser.scripts)
+    haystack = " ".join((lower, resource_urls, script_urls, header_text))
+    found: list[str] = []
+
+    def add(name: str, *patterns: str, source: str = haystack) -> None:
+        if any(pattern in source for pattern in patterns) and name not in found:
+            found.append(name)
+
+    wordpress = (
+        re.search(r'<meta[^>]+(?:name|property)=["\']generator["\'][^>]+content=["\'][^"\']*wordpress', lower)
+        or re.search(r'<meta[^>]+content=["\'][^"\']*wordpress[^"\']*["\'][^>]+(?:name|property)=["\']generator', lower)
+        or any(pattern in haystack for pattern in ("/wp-content/", "/wp-includes/", "wp-json", "wlwmanifest.xml", "xmlrpc.php"))
+        or "wordpress" in headers.get("x-powered-by", "")
+        or "wordpress" in headers.get("server", "")
+        or "wordpress_" in headers.get("set-cookie", "")
+    )
+    if wordpress:
+        found.append("WordPress")
+
+    add("PHP", "x-powered-by: php", ".php", "phpsessid")
+    add("ASP.NET", "asp.net", "aspx", "aspnetcore", "aspnet_sessionid")
+    add("Laravel", "laravel_session", "laravel")
+    add("Drupal", "/sites/default/", "drupal.settings", "drupal")
+    add("Joomla", "/media/system/js/", "joomla")
+    add("Shopify", "cdn.shopify.com", "shopify", "x-shopify-stage")
+    add("Wix", "wixstatic.com", "wix.com", "wix-image")
+    add("Squarespace", "static1.squarespace.com", "squarespace")
+    add("Webflow", "webflow", "website-files.com")
+    add("React", "react", "data-reactroot", "__next_data__", "_next/static")
+    add("Next.js", "_next/static", "__next_data__", "next-route")
+    add("Vue.js", "vue", "data-v-")
+    add("Angular", "ng-version", "ng-app", "angular")
+    add("jQuery", "jquery")
+    add("Bootstrap", "bootstrap")
+    add("Cloudflare", "cloudflare", "cf-ray", "__cf_bm")
+    add("Nginx", "nginx", source=header_text)
+    add("Apache", "apache", source=header_text)
+    return found
+
+
 def _load_wordlist(filename: str, fallback: tuple[str, ...] = ()) -> tuple[str, ...]:
     try:
         values = [line.strip().lower() for line in (_WORDLIST_DIR / filename).read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")]
@@ -129,7 +175,7 @@ def analyze(http_result: dict) -> dict:
     other_contacts = sorted({value.strip() for value in parser.contact_values if value.startswith(("mailto:", "tel:")) and value.split(":", 1)[1].strip()})
     keywords = _load_wordlist("phishing_keywords.txt", ("password", "sign in", "login", "verify", "wallet", "seed phrase", "recovery phrase"))
     found = sorted({word for word in keywords if word in lower})
-    technologies = [name for name, marker in (("WordPress", "wp-content"), ("React", "react"), ("jQuery", "jquery"), ("Cloudflare", "cloudflare")) if marker in lower]
+    technologies = _detect_technologies(body, http_result, parser)
     indicators = []
     title = " ".join("".join(parser.title_parts).split()) or None
     brands = _load_wordlist("brands.txt", ("google", "microsoft", "apple", "paypal", "binance", "facebook", "instagram", "amazon"))
