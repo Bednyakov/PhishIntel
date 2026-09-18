@@ -7,10 +7,38 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.main import CHECK_STAGES, analyze
+from app.tools import resource_parser as resource_parser_tool
+from app.i18n import LocaleContext
 import scan
 
 
 class ProgressTests(unittest.TestCase):
+    @patch("app.tools.resource_parser.print_report")
+    @patch("app.tools.resource_parser.resource_parser.analyze", return_value={"summary": {}})
+    def test_interactive_resource_parser_warns_after_page_scan(self, analyze, print_report):
+        output = io.StringIO()
+        with LocaleContext("ru"), patch("builtins.input", side_effect=["example.com", "1", "1", "1"]), contextlib.redirect_stdout(output):
+            resource_parser_tool.interactive()
+
+        self.assertIn("Сканирование портов ещё выполняется", output.getvalue())
+        self.assertEqual(analyze.call_args.kwargs["progress_callback"].__name__, "_interactive_progress")
+        print_report.assert_called_once()
+
+    @patch("app.analyzers.resource_parser.port_scan.analyze_async")
+    @patch("app.analyzers.resource_parser.sitemap.analyze")
+    @patch("app.analyzers.resource_parser._fetch")
+    def test_ip_target_skips_page_and_sitemap_checks(self, fetch, sitemap, port_scan):
+        async def completed_scan(*_args):
+            return {"status": "ok"}
+
+        port_scan.return_value = completed_scan()
+        report = resource_parser.analyze("192.0.2.10", max_pages=10)
+
+        fetch.assert_not_called()
+        sitemap.assert_not_called()
+        self.assertEqual(report["summary"]["pages_visited"], 0)
+        self.assertEqual(report["summary"]["pages_skipped"], "ip_target")
+
     @patch("app.main.record_history", return_value={"status": "ok"})
     @patch("app.main.score", return_value=({"score": 0, "level": "low", "reasons": []}, []))
     @patch("app.main.subdomains.analyze", return_value={"status": "ok"})

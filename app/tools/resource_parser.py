@@ -59,6 +59,16 @@ def run(target: str, timeout: float = 8.0, max_pages: int = 500, max_depth: int 
     return report
 
 
+def _interactive_progress(update: dict) -> None:
+    _progress(update)
+    if update.get("finished"):
+        print("\n" + tr("port_scan_wait"), flush=True)
+
+
+def _interactive_run(target: str, max_pages: int, max_depth: int, concurrency: int) -> dict:
+    return run(target, max_pages=max_pages, max_depth=max_depth, concurrency=concurrency)
+
+
 def run_cli(args: argparse.Namespace) -> dict:
     return run(args.target, args.timeout, args.max_pages, args.max_depth, args.concurrency, not args.no_progress, not args.stdout)
 
@@ -68,4 +78,12 @@ def interactive() -> dict:
     max_pages = int(input(f"{tr('max_pages')} [500]: ").strip() or "500")
     max_depth = int(input(f"{tr('max_depth')} [8]: ").strip() or "8")
     concurrency = int(input(f"{tr('concurrency')} [8]: ").strip() or "8")
-    return run(target, max_pages=max_pages, max_depth=max_depth, concurrency=concurrency)
+    report = resource_parser.analyze(
+        target,
+        max_pages=max_pages,
+        max_depth=max_depth,
+        concurrency=concurrency,
+        progress_callback=_interactive_progress,
+    )
+    print_report(report)
+    return report

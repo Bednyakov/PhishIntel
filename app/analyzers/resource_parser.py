@@ -41,6 +41,14 @@ _SCRIPT = re.compile(r"(?is)<script\b([^>]*)>(.*?)</script\s*>")
 _ATTR = re.compile(r"(?is)\b(?:href|src|action|data-url|data-api|content)\s*=\s*[\"']([^\"']+)")
 
 
+def _is_ip_address(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
+
+
 def _base_domain(host: str) -> str:
     try:
         ipaddress.ip_address(host)
@@ -181,6 +189,7 @@ def _extract_links(text: str, page_url: str, root: str) -> dict[str, list[str]]:
 
 async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX_PAGES, max_depth: int = _MAX_DEPTH, concurrency: int = 8, progress_callback: Any = None) -> dict[str, Any]:
     host, root_url = normalize_target(target)
+    is_ip_target = _is_ip_address(host)
     user_agents = list_value(_USER_AGENTS, (_USER_AGENT,))
     proxies = list_value(_PROXIES)
     user_agent_cycle = cycle(user_agents)
@@ -188,7 +197,7 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
     port_scan_task = asyncio.create_task(port_scan.analyze_async(host, timeout))
     root = _base_domain(host)
     start = root_url if urllib.parse.urlparse(root_url).scheme in {"http", "https"} else host_url(host)
-    queue: list[tuple[str, int, str]] = [(start, 0, "seed")]
+    queue: list[tuple[str, int, str]] = [] if is_ip_target else [(start, 0, "seed")]
     visited: set[str] = set()
     pages: list[dict[str, Any]] = []
     found = {"emails": [], "phones": [], "wallets": [], "addresses": []}
@@ -197,12 +206,13 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
     errors: list[dict[str, str]] = []
     sitemap_urls: list[str] = []
     sitemap_error: str | None = None
-    try:
-        from . import sitemap
-        sitemap_result = sitemap.analyze(host, timeout)
-        sitemap_urls = [url for url in sitemap_result.get("urls", []) if _normalize_url(url, start, root)]
-    except (OSError, ValueError, TypeError) as exc:
-        sitemap_error = str(exc)
+    if not is_ip_target:
+        try:
+            from . import sitemap
+            sitemap_result = sitemap.analyze(host, timeout)
+            sitemap_urls = [url for url in sitemap_result.get("urls", []) if _normalize_url(url, start, root)]
+        except (OSError, ValueError, TypeError) as exc:
+            sitemap_error = str(exc)
     queue[0:0] = [(sitemap_url, 0, "sitemap") for sitemap_url in sitemap_urls]
     limit = max(1, min(max_pages, _MAX_PAGES))
     pending: set[asyncio.Task] = set()
@@ -269,6 +279,8 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
                         queue.append((normalized, depth + 1, "page"))
             if progress_callback:
                 progress_callback({"completed": len(visited), "queued": len(queue) + len(pending), "pages": max_pages})
+    if progress_callback:
+        progress_callback({"completed": len(visited), "queued": 0, "pages": max_pages, "finished": True})
     summary = {
         "pages_visited": len(visited),
         "pages_with_contacts": sum(1 for page in pages if page.get("contacts")),
@@ -324,6 +336,8 @@ async def async_analyze(target: str, timeout: float = 8.0, max_pages: int = _MAX
             "scripts": external_script_urls,
         },
     }
+    if is_ip_target:
+        report["summary"]["pages_skipped"] = "ip_target"
     try:
         report["port_scan"] = await port_scan_task
     except Exception as exc:
