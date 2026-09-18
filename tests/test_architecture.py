@@ -56,12 +56,23 @@ class ArchitectureTests(unittest.TestCase):
     @patch("main._offer_html_report")
     def test_interactive_menu_offers_html_after_json_report(self, offer_html, _register):
         report = {"target": "example.com", "risk": {"level": "low"}}
-        tool = main.Tool("domain-scan", "Анализ домена", "", lambda: report, lambda _: report)
+        tool = main.Tool("resource-parser", "Сбор данных ресурса", "", lambda: report, lambda _: report)
         answers = iter(["2", "1", "", "0"])
         with patch("main.all_tools", return_value=(tool,)), patch("main._save_report", return_value=Path("reports/example.json")), patch("builtins.input", side_effect=lambda _prompt: next(answers)), patch("main._print_banner"), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main.main([]), 0)
 
         offer_html.assert_called_once_with(report)
+
+    @patch("main._register_tools")
+    @patch("main._offer_html_report")
+    def test_interactive_menu_does_not_offer_html_for_other_tools(self, offer_html, _register):
+        report = {"target": "alice", "tool": "username-search"}
+        tool = main.Tool("username-search", "OSINT: поиск username", "", lambda: report, lambda _: report)
+        answers = iter(["2", "1", "", "0"])
+        with patch("main.all_tools", return_value=(tool,)), patch("main._save_report", return_value=Path("reports/example.json")), patch("builtins.input", side_effect=lambda _prompt: next(answers)), patch("main._print_banner"), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main.main([]), 0)
+
+        offer_html.assert_not_called()
 
     @patch("main._register_tools")
     def test_interactive_menu_can_be_started_in_english(self, _register):

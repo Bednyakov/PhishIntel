@@ -229,7 +229,8 @@ def _interactive_menu() -> int:
             path = _save_report(report)
             print(tr("tool_finished", title=_tool_text(tool, "title")))
             print(tr("report_saved", path=path))
-            _offer_html_report(report)
+            if tool.name == "resource-parser":
+                _offer_html_report(report)
         except (ValueError, OSError) as exc:
             print(tr("execution_error", error=exc), file=sys.stderr)
         input(f"\n{tr('return_menu')}")
